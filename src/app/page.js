@@ -1,102 +1,270 @@
-import Image from "next/image";
+import { getTranslations } from 'next-intl/server';
+import Image from 'next/image';
+import Link from 'next/link';
+import PromoBanner from '@/src/components/PromoBanner';
+import SimpleProductCard from '@/src/components/SimpleProductCard'; // Новый импорт
+import CategoryCard from '@/src/components/CategoryCard';
+import TipCard from '@/src/components/TipCard';
+import Icon from '@/src/components/Icon';
+import { cookies } from 'next/headers';
 
-export default function Home() {
+export default async function Home() {
+  const cookieStore = await cookies();
+  const locale = cookieStore.get('my_shikshop_locale')?.value || 'ru';
+  console.log('Home: locale =', locale);
+
+  const t = await getTranslations('home');
+
+  let apiData = [];
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/products`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) throw new Error('Failed to fetch');
+    apiData = await res.json();
+  } catch (error) {
+    console.error('Home: error fetching API', error);
+    apiData = [
+      { title: t('categories.item1.name'), description: t('categories.item1.description'), image: null, type: 'collection' },
+      { title: t('categories.item2.name'), description: t('categories.item2.description'), image: null, type: 'collection' },
+      { title: t('categories.item3.name'), description: t('categories.item3.description'), image: null, type: 'collection' },
+      { title: t('products.item1.name'), price: 49.99, image: null },
+      { title: t('products.item2.name'), price: 79.99, image: null },
+      { title: t('products.item3.name'), price: 29.99, image: null },
+      { title: t('products.item4.name'), price: 59.99, image: null },
+      { title: t('products.item5.name'), price: 39.99, image: null },
+      { title: t('products.item6.name'), price: 69.99, image: null },
+    ];
+  }
+
+  const categories = apiData
+    .filter(item => item.type === 'collection' || item.type === 'look')
+    .map((item, id) => ({
+      id,
+      name: item.name || item.title,
+      description: item.description,
+      image: item.image,
+    }));
+
+  const products = apiData
+    .filter(item => !item.type || (item.type !== 'collection' && item.type !== 'look'))
+    .map((item, id) => ({
+      _id: item._id || id.toString(),
+      name: item.name || item.title,
+      price: item.price,
+      image: item.image,
+    }));
+
+  let tips = [];
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/blogs`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) throw new Error('Failed to fetch blogs');
+    tips = await res.json();
+  } catch (error) {
+    console.error('Home: error fetching blogs API', error);
+    tips = [
+      { id: 1, title: t('tips.item1.title'), description: t('tips.item1.description'), icon: '/images/tip1.svg' },
+      { id: 2, title: t('tips.item2.title'), description: t('tips.item2.description'), icon: '/images/tip2.svg' },
+    ];
+  }
+
+  const socialPosts = [
+    { id: 1, image: '/images/instagram1.jpg' },
+    { id: 2, image: '/images/instagram2.jpg' },
+    { id: 3, image: '/images/instagram3.jpg' },
+  ];
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen">
+      <section className="relative h-110 sm:h-[80vh] overflow-hidden" data-aos="fade-up">
+  <Image
+    src="/images/banner.jpg"
+    alt={t('bannerAlt')}
+    fill
+    className="object-cover w-full h-full z-0"
+    priority
+    sizes="100vw"
+  />
+  <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-text-light dark:text-text-dark z-10">
+    <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4">{t('bannerTitle')}</h1>
+    <p className="text-base sm:text-lg md:text-2xl mb-6 max-w-2xl">{t('bannerDescription')}</p>
+    <Link href="/catalog" className="btn">
+      {t('bannerButton')}
+    </Link>
+    <p className="mt-4 text-sm">{t('freeShipping')}</p>
+  </div>
+</section>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <section className="py-10" data-aos="fade-up">
+        <h2 className="text-3xl font-semibold text-dark-teal text-center mb-8 dark:text-text-light">{t('categoriesTitle')}</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 max-w-7xl mx-auto px-4">
+          {categories.map((category, index) => (
+            <div
+              key={category.id}
+              className="flex flex-col items-center gap-4"
+              data-aos="fade-up"
+              data-aos-delay={index * 100}
+            >
+              <CategoryCard
+                name={category.name}
+                description={category.description}
+                image={category.image}
+                className="w-full"
+              />
+            </div>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <div className="text-center mt-8">
+          <Link href="/catalog" className="bg-accent-rose text-text-light px-6 py-3 rounded-lg hover:bg-primary-pink transition-all inline-block">
+            {t('viewAllRest')}
+          </Link>
+        </div>
+      </section>
+
+      <section className="py-16 bg-secondary-peach dark:bg-accent-emerald relative" data-aos="fade-up">
+        <h2 className="text-3xl font-semibold text-dark-teal text-center mb-8 dark:text-text-light">{t('productsTitle')}</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-7xl mx-auto px-4">
+          {products.map((product, index) => (
+            <SimpleProductCard
+              key={product._id}
+              product={product}
+              className={index % 2 === 1 ? 'mt-4 sm:mt-0' : ''}
+              data-aos="fade-up"
+              data-aos-delay={index * 100}
+            />
+          ))}
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-b from-bg-light/0 to-bg-light dark:from-dark-teal/0 dark:to-dark-teal" />
+        <div className="text-center mt-8">
+          <Link
+            href="/catalog"
+            className="bg-primary-pink text-text-light px-6 py-3 rounded-lg hover:bg-[#F0D9D0] transition-all inline-block dark:bg-accent-rose dark:hover:bg-primary-pink"
+            data-aos="fade-up"
+          >
+            {t('viewAll')}
+          </Link>
+        </div>
+      </section>
+
+      <section className="py-5" data-aos="fade-up">
+        <div className="relative h-64 max-w-7xl mx-auto rounded-lg overflow-hidden">
           <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+            src="/images/brand.jpg"
+            alt={t('brandAlt')}
+            width={1920}
+            height={1080}
+            className="object-cover z-0"
+            priority
+            sizes="100vw"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-text-light dark:text-text-dark z-0">
+            <h2 className="text-3xl font-semibold mb-4">{t('brandTitle')}</h2>
+            <p className="text-lg mb-6 max-w-xl">{t('brandDescription')}</p>
+            <Link
+              href="/about"
+              className="bg-primary-pink text-dark-teal px-6 py-3 rounded-lg hover:bg-accent-rose transition-transform transform hover:scale-105 dark:bg-secondary-lavender dark:text-text-light"
+            >
+              {t('brandButton')}
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 bg-soft-rose dark:bg-secondary-lavender" data-aos="fade-up">
+  <h2 className="text-3xl font-semibold text-dark-teal text-center mb-8 dark:text-text-light">{t('tipsTitle')}</h2>
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-7xl mx-auto px-4">
+    {tips.slice(0, 3).map((tip, index) => (
+      <Link key={tip._id || tip.id} href="/about" data-aos="fade-up">
+        <TipCard
+          title={tip.title}
+          description={tip.description}
+          icon={index % 2 === 0 ? '/images/tip1.svg' : '/images/tip2.svg'}
+          className="flex flex-row items-center hover:shadow-lg transition-shadow"
+        />
+      </Link>
+    ))}
+  </div>
+</section>
+
+      <section className="py-5" data-aos="fade-up">
+        <PromoBanner
+          title={t('promoTitle')}
+          description={t('promoDescription')}
+          buttonText={t('promoButton')}
+          buttonLink="/catalog"
+          className="bg-linear-to-r from-primary-pink to-secondary-lavender text-text-light dark:text-text-dark"
+          buttonClassName="bg-promo-accent hover:bg-primary-pink text-text-light dark:bg-secondary-lavender dark:hover:bg-accent-rose dark:text-text-light"
+        />
+      </section>
+
+      <section className="py-16" data-aos="fade-up">
+        <h2 className="text-3xl font-semibold text-dark-teal text-center mb-8 dark:text-text-light">{t('socialTitle')}</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-7xl mx-auto px-4">
+          {socialPosts.map((post) => (
+            <div key={post.id} className="relative h-48 rounded-lg overflow-hidden transition-transform transform hover:scale-105" data-aos="fade-up">
+              <Image
+                src={post.image || '/images/placeholder.jpg'}
+                alt="Instagram post"
+                width={300}
+                height={300}
+                className="object-cover"
+                sizes="(max-width: 768px) 50vw, 33vw"
+              />
+            </div>
+          ))}
+        </div>
+        <p className="text-center mt-8">
+          <Link href="https://www.instagram.com/shik_shak_shop.tj/" target="_blank" className="text-accent-emerald hover:underline dark:text-text-light">
+            {t('socialButton')}
+          </Link>
+        </p>
+      </section>
+
+      <footer className="bg-dark-teal text-text-light py-12 dark:bg-accent-emerald dark:text-text-dark" data-aos="fade-up">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-3 gap-8">
+          <div className="order-first sm:order-none">
+            <h3 className="text-xl font-semibold mb-4">{t('footerSubscribeTitle')}</h3>
+            <form className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="email"
+                placeholder={t('footerSubscribePlaceholder')}
+                className="p-2 rounded bg-text-light text-dark-teal border border-neutral-gray dark:bg-card-cream dark:text-dark-teal"
+              />
+              <button className="bg-accent-rose text-text-light px-4 py-2 rounded hover:bg-primary-pink dark:bg-primary-pink dark:hover:bg-accent-rose">
+                {t('footerSubscribeButton')}
+              </button>
+            </form>
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold mb-4">{t('footerContactTitle')}</h3>
+            <p>{t('footerAddress')}</p>
+            <p>{t('footerPhone')}</p>
+            <p>{t('footerEmail')}</p>
+            <div className="flex space-x-4 mt-4">
+              <a href="https://www.instagram.com/shik_shak_shop.tj/" target="_blank" className="hover:text-primary-pink dark:hover:text-secondary-peach">
+                <Icon name="instagram" className="w-6 h-6" />
+              </a>
+              <a href="https://whatsapp.com/channel/0029VbAeSyaAzNbnGuVFzZ1r" target="_blank" className="hover:text-primary-pink dark:hover:text-secondary-peach">
+                <Icon name="whatsapp" className="w-6 h-6" />
+              </a>
+            </div>
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold mb-4">{t('footerLinksTitle')}</h3>
+            <ul className="space-y-2">
+              <li><Link href="/" className="hover:underline">{t('headerhome')}</Link></li>
+              <li><Link href="/catalog" className="hover:underline">{t('headercatalog')}</Link></li>
+              <li><Link href="/lookbook" className="hover:underline">{t('headerlookbook')}</Link></li>
+              <li><Link href="/about" className="hover:underline">{t('headerabout')}</Link></li>
+              <li><Link href="/contacts" className="hover:underline">{t('headercontacts')}</Link></li>
+            </ul>
+          </div>
+        </div>
+        <div className="mt-8 text-center text-neutral-gray dark:text-text-light">
+          <p>{t('footerCopyright')}</p>
+        </div>
       </footer>
     </div>
   );
