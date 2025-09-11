@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import { connectMongoDB } from '../../../lib/mongodb';
-import Review from '../../../models/review';
+import Review from '../../../models/Review';
 
 export async function GET(request) {
   try {
