@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectMongoDB } from '../../../../lib/mongodb';
 import Review from '../../../../models/Review';
-
 export async function GET() {
   try {
     await connectMongoDB();
