@@ -2,11 +2,14 @@ import { getTranslations } from 'next-intl/server';
 import Image from 'next/image';
 import Link from 'next/link';
 import PromoBanner from '@/src/components/PromoBanner';
-import SimpleProductCard from '@/src/components/SimpleProductCard'; // Новый импорт
+import SimpleProductCard from '@/src/components/SimpleProductCard';
 import CategoryCard from '@/src/components/CategoryCard';
 import TipCard from '@/src/components/TipCard';
 import Icon from '@/src/components/Icon';
 import { cookies } from 'next/headers';
+
+// Заставляем страницу рендериться динамически (опционально, если cache: 'no-store' недостаточно)
+export const dynamic = 'force-dynamic';
 
 export default async function Home() {
   const cookieStore = await cookies();
@@ -15,26 +18,17 @@ export default async function Home() {
 
   const t = await getTranslations('home');
 
+  // Загрузка данных о продуктах и категориях
   let apiData = [];
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/products`, {
-      next: { revalidate: 3600 },
+      cache: 'no-store', // Динамический fetch без кэширования
     });
-    if (!res.ok) throw new Error('Failed to fetch');
+    if (!res.ok) throw new Error('Failed to fetch products');
     apiData = await res.json();
   } catch (error) {
     console.error('Home: error fetching API', error);
-    apiData = [
-      { title: t('categories.item1.name'), description: t('categories.item1.description'), image: null, type: 'collection' },
-      { title: t('categories.item2.name'), description: t('categories.item2.description'), image: null, type: 'collection' },
-      { title: t('categories.item3.name'), description: t('categories.item3.description'), image: null, type: 'collection' },
-      { title: t('products.item1.name'), price: 49.99, image: null },
-      { title: t('products.item2.name'), price: 79.99, image: null },
-      { title: t('products.item3.name'), price: 29.99, image: null },
-      { title: t('products.item4.name'), price: 59.99, image: null },
-      { title: t('products.item5.name'), price: 39.99, image: null },
-      { title: t('products.item6.name'), price: 69.99, image: null },
-    ];
+    apiData = []; // Пустой массив вместо статического fallback
   }
 
   const categories = apiData
@@ -53,21 +47,20 @@ export default async function Home() {
       name: item.name || item.title,
       price: item.price,
       image: item.image,
-    }));
+    }))
+    .slice(0, 6); // Ограничиваем до 6 товаров
 
+  // Загрузка данных о советах
   let tips = [];
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/blogs`, {
-      next: { revalidate: 3600 },
+      cache: 'no-store', // Динамический fetch без кэширования
     });
     if (!res.ok) throw new Error('Failed to fetch blogs');
     tips = await res.json();
   } catch (error) {
     console.error('Home: error fetching blogs API', error);
-    tips = [
-      { id: 1, title: t('tips.item1.title'), description: t('tips.item1.description'), icon: '/images/tip1.svg' },
-      { id: 2, title: t('tips.item2.title'), description: t('tips.item2.description'), icon: '/images/tip2.svg' },
-    ];
+    tips = []; // Пустой массив вместо статического fallback
   }
 
   const socialPosts = [
@@ -79,42 +72,46 @@ export default async function Home() {
   return (
     <div className="min-h-screen">
       <section className="relative h-110 sm:h-[80vh] overflow-hidden" data-aos="fade-up">
-  <Image
-    src="/images/banner.jpg"
-    alt={t('bannerAlt')}
-    fill
-    className="object-cover w-full h-full z-0"
-    priority
-    sizes="100vw"
-  />
-  <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-text-light dark:text-text-dark z-10">
-    <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4">{t('bannerTitle')}</h1>
-    <p className="text-base sm:text-lg md:text-2xl mb-6 max-w-2xl">{t('bannerDescription')}</p>
-    <Link href="/catalog" className="btn">
-      {t('bannerButton')}
-    </Link>
-    <p className="mt-4 text-sm">{t('freeShipping')}</p>
-  </div>
-</section>
+        <Image
+          src="/images/banner.jpg"
+          alt={t('bannerAlt')}
+          fill
+          className="object-cover w-full h-full z-0"
+          priority
+          sizes="100vw"
+        />
+        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-text-light dark:text-text-dark z-10">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4">{t('bannerTitle')}</h1>
+          <p className="text-base sm:text-lg md:text-2xl mb-6 max-w-2xl">{t('bannerDescription')}</p>
+          <Link href="/catalog" className="btn">
+            {t('bannerButton')}
+          </Link>
+          <p className="mt-4 text-sm">{t('freeShipping')}</p>
+        </div>
+      </section>
 
       <section className="py-10" data-aos="fade-up">
         <h2 className="text-3xl font-semibold text-dark-teal text-center mb-8 dark:text-text-light">{t('categoriesTitle')}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 max-w-7xl mx-auto px-4">
-          {categories.map((category, index) => (
-            <div
-              key={category.id}
-              className="flex flex-col items-center gap-4"
-              data-aos="fade-up"
-              data-aos-delay={index * 100}
-            >
-              <CategoryCard
-                name={category.name}
-                description={category.description}
-                image={category.image}
-                className="w-full"
-              />
-            </div>
-          ))}
+          {categories.length > 0 ? (
+            categories.map((category, index) => (
+              <div
+                key={category.id}
+                className="flex flex-col items-center gap-4"
+                data-aos="fade-up"
+                data-aos-delay={index * 100}
+              >
+                <CategoryCard
+                  name={category.name}
+                  description={category.description}
+                  image={category.image}
+                  className="w-full"
+                />
+              </div>
+            ))
+          ) : (
+            <p className="text-center col-span-full">Ошибка загрузки категорий. Попробуйте позже.</p>
+          )}
         </div>
         <div className="text-center mt-8">
           <Link href="/catalog" className="bg-accent-rose text-text-light px-6 py-3 rounded-lg hover:bg-primary-pink transition-all inline-block">
@@ -126,15 +123,19 @@ export default async function Home() {
       <section className="py-16 bg-secondary-peach dark:bg-accent-emerald relative" data-aos="fade-up">
         <h2 className="text-3xl font-semibold text-dark-teal text-center mb-8 dark:text-text-light">{t('productsTitle')}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-7xl mx-auto px-4">
-          {products.map((product, index) => (
-            <SimpleProductCard
-              key={product._id}
-              product={product}
-              className={index % 2 === 1 ? 'mt-4 sm:mt-0' : ''}
-              data-aos="fade-up"
-              data-aos-delay={index * 100}
-            />
-          ))}
+          {products.length > 0 ? (
+            products.map((product, index) => (
+              <SimpleProductCard
+                key={product._id}
+                product={product}
+                className={index % 2 === 1 ? 'mt-4 sm:mt-0' : ''}
+                data-aos="fade-up"
+                data-aos-delay={index * 100}
+              />
+            ))
+          ) : (
+            <p className="text-center col-span-full">Ошибка загрузки товаров. Попробуйте позже.</p>
+          )}
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-b from-bg-light/0 to-bg-light dark:from-dark-teal/0 dark:to-dark-teal" />
         <div className="text-center mt-8">
@@ -173,20 +174,24 @@ export default async function Home() {
       </section>
 
       <section className="py-16 bg-soft-rose dark:bg-secondary-lavender" data-aos="fade-up">
-  <h2 className="text-3xl font-semibold text-dark-teal text-center mb-8 dark:text-text-light">{t('tipsTitle')}</h2>
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-7xl mx-auto px-4">
-    {tips.slice(0, 3).map((tip, index) => (
-      <Link key={tip._id || tip.id} href="/about" data-aos="fade-up">
-        <TipCard
-          title={tip.title}
-          description={tip.description}
-          icon={index % 2 === 0 ? '/images/tip1.svg' : '/images/tip2.svg'}
-          className="flex flex-row items-center hover:shadow-lg transition-shadow"
-        />
-      </Link>
-    ))}
-  </div>
-</section>
+        <h2 className="text-3xl font-semibold text-dark-teal text-center mb-8 dark:text-text-light">{t('tipsTitle')}</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-7xl mx-auto px-4">
+          {tips.length > 0 ? (
+            tips.slice(0, 3).map((tip, index) => (
+              <Link key={tip._id || tip.id} href="/about" data-aos="fade-up">
+                <TipCard
+                  title={tip.title}
+                  description={tip.description}
+                  icon={index % 2 === 0 ? '/images/tip1.svg' : '/images/tip2.svg'}
+                  className="flex flex-row items-center hover:shadow-lg transition-shadow"
+                />
+              </Link>
+            ))
+          ) : (
+            <p className="text-center col-span-full">Ошибка загрузки советов. Попробуйте позже.</p>
+          )}
+        </div>
+      </section>
 
       <section className="py-5" data-aos="fade-up">
         <PromoBanner
