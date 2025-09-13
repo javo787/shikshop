@@ -8,7 +8,7 @@ import TipCard from '@/src/components/TipCard';
 import Icon from '@/src/components/Icon';
 import { cookies } from 'next/headers';
 
-// Заставляем страницу рендериться динамически (опционально, если cache: 'no-store' недостаточно)
+// Заставляем страницу рендериться динамически
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
@@ -21,13 +21,13 @@ export default async function Home() {
   // Загрузка данных о продуктах и категориях
   let apiData = [];
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/products`, {
+    const res = await fetch('/api/products', {
       cache: 'no-store', // Динамический fetch без кэширования
     });
     if (!res.ok) throw new Error('Failed to fetch products');
     apiData = await res.json();
   } catch (error) {
-    console.error('Home: error fetching API', error);
+    console.error('Home: error fetching products API', error);
     apiData = []; // Пустой массив вместо статического fallback
   }
 
@@ -53,7 +53,7 @@ export default async function Home() {
   // Загрузка данных о советах
   let tips = [];
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/blogs`, {
+    const res = await fetch('/api/blogs', {
       cache: 'no-store', // Динамический fetch без кэширования
     });
     if (!res.ok) throw new Error('Failed to fetch blogs');

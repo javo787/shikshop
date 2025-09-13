@@ -36,9 +36,9 @@ export default function Contacts() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
           <h2 className="text-2xl font-semibold text-text-dark mb-4">Свяжитесь с нами</h2>
-          <p className="text-text-gray mb-2">Email: <a href="mailto:info@shikshakshop.com" className="text-accent-rose">info@shikshakshop.com</a></p>
-          <p className="text-text-gray mb-2">Телефон: <a href="tel:+1234567890" className="text-accent-rose">+1 (234) 567-890</a></p>
-          <p className="text-text-gray mb-2">Адрес: г. Москва, ул. Модная, д. 123</p>
+          <p className="text-text-gray mb-2">Email: <a href="mailto:info@shikshakshop.com" className="text-accent-rose">...</a></p>
+          <p className="text-text-gray mb-2">Телефон: <a href="tel:+1234567890" className="text-accent-rose">+992 01 696 0100</a></p>
+          <p className="text-text-gray mb-2">Адрес: г. Худжанд, ул. Гафурова, д. А376</p>
           <p className="text-text-gray">Часы работы: Пн-Пт, 9:00–18:00</p>
         </div>
         <div>
