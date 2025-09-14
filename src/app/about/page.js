@@ -9,7 +9,7 @@ export default async function About() {
 
   let blogs = [];
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/blogs`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/blogs`, {
       next: { revalidate: 3600 },
     });
     if (!res.ok) throw new Error('Failed to fetch blogs');

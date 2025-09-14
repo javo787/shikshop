@@ -5,8 +5,12 @@ config({ path: '.env.local' });
 
 let conn = null;
 let gfs = null;
+let isConnecting = false; // Флаг для предотвращения параллельных подключений
 
-export async function connectMongoDB() {
+// Функция для ожидания (используется для повторных попыток)
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+export async function connectMongoDB(attempt = 1, maxAttempts = 3) {
   if (conn && gfs) {
     try {
       await conn.connection.db.command({ ping: 1 });
@@ -19,22 +23,31 @@ export async function connectMongoDB() {
     }
   }
 
+  if (isConnecting) {
+    console.log('Подключение уже в процессе, ожидание...');
+    while (isConnecting && attempt <= maxAttempts) {
+      await sleep(1000); // Ждем 1 секунду перед проверкой
+    }
+    if (conn && gfs) return { conn, gfs };
+  }
+
+  isConnecting = true;
+
   try {
     if (!process.env.MONGODB_URI) {
       throw new Error('MONGODB_URI не указан в .env.local');
     }
 
-    console.log('Попытка подключения к MongoDB...');
+    console.log(`Попытка подключения к MongoDB (попытка ${attempt}/${maxAttempts})...`);
     conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
+      serverSelectionTimeoutMS: 10000, // Увеличенный таймаут выбора сервера
+      connectTimeoutMS: 15000, // Увеличенный таймаут подключения
+      socketTimeoutMS: 60000, // Увеличенный таймаут сокета
       maxPoolSize: 10,
       appName: 'shikshak-shop',
     });
 
     if (!conn.connection.db) {
-      console.error('MongoDB connection db is undefined');
       throw new Error('MongoDB connection database is undefined');
     }
 
@@ -51,18 +64,26 @@ export async function connectMongoDB() {
     console.log('Коллекция images.chunks существует:', hasImagesChunks);
 
     if (!hasImagesFiles || !hasImagesChunks) {
-      console.error('GridFS коллекции отсутствуют');
       throw new Error('GridFS collections missing');
     }
 
     await conn.connection.db.command({ ping: 1 });
     console.log('MongoDB ping успешен');
 
+    isConnecting = false;
     return { conn, gfs };
   } catch (error) {
-    console.error('Ошибка подключения MongoDB:', error.message);
+    console.error(`Ошибка подключения MongoDB (попытка ${attempt}/${maxAttempts}):`, error.message);
     conn = null;
     gfs = null;
-    throw error;
+    isConnecting = false;
+
+    if (attempt < maxAttempts) {
+      console.log(`Повторная попытка подключения через 2 секунды...`);
+      await sleep(2000);
+      return connectMongoDB(attempt + 1, maxAttempts);
+    }
+
+    throw new Error(`Не удалось подключиться к MongoDB после ${maxAttempts} попыток: ${error.message}`);
   }
 }

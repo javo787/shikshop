@@ -20,11 +20,13 @@ export default function ProductPage() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [loading, setLoading] = useState(true); // Added loading state
   const modalRef = useRef(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
+        setLoading(true); // Set loading to true before fetching
         const res = await fetch(`/api/products/${id}`);
         if (!res.ok) throw new Error('Failed to fetch product');
         const data = await res.json();
@@ -40,6 +42,8 @@ export default function ProductPage() {
         }
       } catch (err) {
         setError('Ошибка загрузки товара');
+      } finally {
+        setLoading(false); // Set loading to false after fetching
       }
     };
 
@@ -155,10 +159,21 @@ export default function ProductPage() {
   const descriptionBullets = product?.description ? product.description.split('. ').filter(d => d.trim()) : [];
 
   if (error) return <div className="text-red-500 text-center">{error}</div>;
+  if (loading) return (
+    <div className="flex justify-center items-center h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+    </div>
+  );
   if (!product) return <div className="text-center">Загрузка...</div>;
 
   return (
     <div className="container mx-auto p-4">
+      {/* Спиннер загрузки */}
+      {loading && (
+        <div className="flex justify-center mb-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      )}
       <h1 className="text-3xl font-bold text-text-dark mb-6">{product.name}</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Галерея изображений */}
@@ -182,6 +197,7 @@ export default function ProductPage() {
               </button>
             </>
           )}
+          
           {/* Большое изображение */}
           <div className="cursor-pointer" onClick={handleImageClick}>
             <Image

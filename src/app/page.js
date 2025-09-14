@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
-import Image from 'next/image';
 import Link from 'next/link';
+import ClientImage from '@/src/components/ClientImage';
 import PromoBanner from '@/src/components/PromoBanner';
 import SimpleProductCard from '@/src/components/SimpleProductCard';
 import CategoryCard from '@/src/components/CategoryCard';
@@ -11,42 +11,77 @@ import { cookies } from 'next/headers';
 // Заставляем страницу рендериться динамически
 export const dynamic = 'force-dynamic';
 
-export default async function Home() {
-  const cookieStore = await cookies();
-  const locale = cookieStore.get('my_shikshop_locale')?.value || 'ru';
-  console.log('Home: locale =', locale);
+// Генерация мета-тегов
+export async function generateMetadata({ params: { locale } }) {
+  const t = await getTranslations({ locale, namespace: 'home' });
 
-  const t = await getTranslations('home');
+  return {
+    title: t('metaTitle') || 'SirOyLi - Женская одежда в Душанбе',
+    description: t('metaDescription') || 'Модная женская одежда в Душанбе. Платья, костюмы, аксессуары и многое другое. Бесплатная доставка по городу!',
+    keywords: t('metaKeywords') || 'женская одежда, мода, Душанбе, платья, костюмы, аксессуары, SirOyLi',
+    openGraph: {
+      title: t('metaTitle') || 'SirOyLi - Женская одежда',
+      description: t('metaDescription') || 'Ознакомьтесь с нашей коллекцией стильной женской одежды в Душанбе.',
+      url: 'https://shikshop.vercel.app/', // Замените на https://SirOyLi.vercel.app/, если домен изменился
+      siteName: 'SirOyLi',
+      images: [
+        {
+          url: 'https://shikshop.vercel.app/images/og-image.jpg',
+          width: 1200,
+          height: 630,
+          alt: t('bannerAlt') || 'SirOyLi - Модная женская одежда',
+        },
+      ],
+      locale: locale || 'ru_TJ',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: t('metaTitle') || 'SirOyLi - Женская одежда',
+      description: t('metaDescription') || 'Модная женская одежда в Душанбе.',
+      images: ['https://shikshop.vercel.app/images/og-image.jpg'],
+    },
+  };
+}
+
+export default async function Home({ params: { locale = 'ru' } }) {
+  const cookieStore = await cookies();
+  const userLocale = cookieStore.get('my_shikshop_locale')?.value || locale;
+  console.log('Home: locale =', userLocale);
+
+  const t = await getTranslations({ locale: userLocale, namespace: 'home' });
 
   // Загрузка данных о продуктах и категориях
   let apiData = [];
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/products`, {
-  cache: 'no-store',
-}); // Динамический fetch без кэширования
+      cache: 'no-store',
+    });
     if (!res.ok) throw new Error('Failed to fetch products');
     apiData = await res.json();
   } catch (error) {
-    console.error('Home: error fetching products API', error);
-    apiData = []; // Пустой массив вместо статического fallback
+    console.error('Home: error fetching products API', error.message);
+    apiData = [];
   }
 
   const categories = apiData
     .filter(item => item.type === 'collection' || item.type === 'look')
     .map((item, id) => ({
       id,
-      name: item.name || item.title,
-      description: item.description,
-      image: item.image,
-    }));
-
+      name: item.name || item.title || t('noName') || 'Без названия',
+      description: item.description || '',
+      image: item.image || '/images/placeholder.jpg',
+      imageAlt: item.name ? `${item.name} - ${t('categoryAlt')}` : t('categoryAlt') || 'Категория одежды SirOyLi',
+    }))
+     .slice(0, 6); 
   const products = apiData
     .filter(item => !item.type || (item.type !== 'collection' && item.type !== 'look'))
     .map((item, id) => ({
       _id: item._id || id.toString(),
-      name: item.name || item.title,
-      price: item.price,
-      image: item.image,
+      name: item.name || item.title || t('noName') || 'Без названия',
+      price: item.price || null,
+      image: item.image || '/images/placeholder.jpg',
+      imageAlt: item.name ? `${item.name} - ${t('productAlt')}` : t('productAlt') || 'Товар SirOyLi',
     }))
     .slice(0, 6); // Ограничиваем до 6 товаров
 
@@ -55,30 +90,30 @@ export default async function Home() {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/blogs`, {
       cache: 'no-store',
-    }); // Динамический fetch без кэширования
-
+    });
     if (!res.ok) throw new Error('Failed to fetch blogs');
     tips = await res.json();
   } catch (error) {
-    console.error('Home: error fetching blogs API', error);
-    tips = []; // Пустой массив вместо статического fallback
+    console.error('Home: error fetching blogs API', error.message);
+    tips = [];
   }
 
   const socialPosts = [
-    { id: 1, image: '/images/instagram1.jpg' },
-    { id: 2, image: '/images/instagram2.jpg' },
-    { id: 3, image: '/images/instagram3.jpg' },
+    { id: 1, image: '/images/instagram1.jpg', alt: t('socialAlt') || 'SirOyLi в Instagram - Пост 1' },
+    { id: 2, image: '/images/instagram2.jpg', alt: t('socialAlt') || 'SirOyLi в Instagram - Пост 2' },
+    { id: 3, image: '/images/instagram3.jpg', alt: t('socialAlt') || 'SirOyLi в Instagram - Пост 3' },
   ];
 
   return (
     <div className="min-h-screen">
       <section className="relative h-110 sm:h-[80vh] overflow-hidden" data-aos="fade-up">
-        <Image
+        <ClientImage
           src="/images/banner.jpg"
-          alt={t('bannerAlt')}
+          alt={t('bannerAlt') || 'SirOyLi - Главный баннер модной женской одежды'}
           fill
           className="object-cover w-full h-full z-0"
           priority
+          loading="eager"
           sizes="100vw"
         />
         <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-text-light dark:text-text-dark z-10">
@@ -106,12 +141,13 @@ export default async function Home() {
                   name={category.name}
                   description={category.description}
                   image={category.image}
+                  imageAlt={category.imageAlt}
                   className="w-full"
                 />
               </div>
             ))
           ) : (
-            <p className="text-center col-span-full">Ошибка загрузки категорий. Попробуйте позже.</p>
+            <p className="text-center col-span-full">{t('errorCategories') || 'Ошибка загрузки категорий. Попробуйте позже.'}</p>
           )}
         </div>
         <div className="text-center mt-8">
@@ -128,14 +164,17 @@ export default async function Home() {
             products.map((product, index) => (
               <SimpleProductCard
                 key={product._id}
-                product={product}
+                product={{
+                  ...product,
+                  imageAlt: product.imageAlt,
+                }}
                 className={index % 2 === 1 ? 'mt-4 sm:mt-0' : ''}
                 data-aos="fade-up"
                 data-aos-delay={index * 100}
               />
             ))
           ) : (
-            <p className="text-center col-span-full">Ошибка загрузки товаров. Попробуйте позже.</p>
+            <p className="text-center col-span-full">{t('errorProducts') || 'Ошибка загрузки товаров. Попробуйте позже.'}</p>
           )}
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-b from-bg-light/0 to-bg-light dark:from-dark-teal/0 dark:to-dark-teal" />
@@ -152,13 +191,14 @@ export default async function Home() {
 
       <section className="py-5" data-aos="fade-up">
         <div className="relative h-64 max-w-7xl mx-auto rounded-lg overflow-hidden">
-          <Image
+          <ClientImage
             src="/images/brand.jpg"
-            alt={t('brandAlt')}
+            alt={t('brandAlt') || 'SirOyLi - О бренде'}
             width={1920}
             height={1080}
             className="object-cover z-0"
             priority
+            loading="eager"
             sizes="100vw"
           />
           <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-text-light dark:text-text-dark z-0">
@@ -189,7 +229,7 @@ export default async function Home() {
               </Link>
             ))
           ) : (
-            <p className="text-center col-span-full">Ошибка загрузки советов. Попробуйте позже.</p>
+            <p className="text-center col-span-full">{t('errorTips') || 'Ошибка загрузки советов. Попробуйте позже.'}</p>
           )}
         </div>
       </section>
@@ -210,12 +250,13 @@ export default async function Home() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-7xl mx-auto px-4">
           {socialPosts.map((post) => (
             <div key={post.id} className="relative h-48 rounded-lg overflow-hidden transition-transform transform hover:scale-105" data-aos="fade-up">
-              <Image
-                src={post.image || '/images/placeholder.jpg'}
-                alt="Instagram post"
+              <ClientImage
+                src={post.image}
+                alt={post.alt}
                 width={300}
                 height={300}
                 className="object-cover"
+                loading="eager"
                 sizes="(max-width: 768px) 50vw, 33vw"
               />
             </div>

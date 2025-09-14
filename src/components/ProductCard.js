@@ -1,5 +1,7 @@
-import Image from 'next/image';
+'use client';
+
 import Link from 'next/link';
+import ClientImage from './ClientImage';
 import Icon from './Icon';
 
 export default function ProductCard({ product, onQuickView }) {
@@ -11,17 +13,19 @@ export default function ProductCard({ product, onQuickView }) {
     <div className="border rounded-lg overflow-hidden shadow-md">
       <Link href={`/product/${product._id}`}>
         <div className="relative w-full h-64">
-          <Image
-            src={product.image || '/placeholder.jpg'}
-            alt={product.name || 'Товар'}
+          <ClientImage
+            src={product.image || '/images/placeholder.jpg'}
+            alt={product.imageAlt || product.name || 'Товар SirOyLi'}
             fill
             className="object-contain"
+            loading="eager"
+            sizes="(max-width: 768px) 50vw, 25vw"
           />
         </div>
       </Link>
       <div className="p-4 text-center">
         <h3 className="text-lg font-semibold text-text-dark">{product.name || 'Без названия'}</h3>
-        <p className="text-text-gray mb-2">{product.price ? `${product.price} ₽` : 'Цена не указана'}</p>
+        <p className="text-text-gray mb-2">{product.price ? `${product.price} TJS` : 'Цена не указана'}</p>
         <div className="flex justify-center gap-2">
           <button
             onClick={onQuickView}

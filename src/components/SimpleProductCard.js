@@ -1,37 +1,30 @@
+'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
+import ClientImage from './ClientImage';
 
-export default function SimpleProductCard({ product }) {
-  if (!product || !product._id) {
-    return <div className="text-red-500 text-center">Ошибка: товар не найден</div>;
-  }
-
+export default function SimpleProductCard({ product, className, ...props }) {
   return (
-    <div className="border rounded-lg overflow-hidden shadow-md">
-      <Link href={`/product/${product._id}`}>
-        <div className="relative w-full h-64">
-          <Image
-            src={product.image || '/placeholder.jpg'}
-            alt={product.name || 'Товар'}
-            fill
-            className="object-contain"
-          />
-        </div>
-      </Link>
-      <div className="p-4 text-center">
-        <h3 className="text-lg font-semibold text-text-dark">{product.name || 'Без названия'}</h3>
-        <p className="text-text-gray mb-2">{product.price ? `${product.price} ₽` : 'Цена не указана'}</p>
-        <div className="flex justify-center">
-          <Link
-            href={`/product/${product._id}`}
-            className="px-2 py-1 bg-blue-500 text-white rounded text-sm sm:text-base hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            aria-label={`Перейти к товару ${product.name || 'Товар'}`}
-          >
-            Подробнее
-          </Link>
+    <Link href={`/product/${product._id}`} className={`block ${className}`} {...props}>
+      <div className="bg-white dark:bg-card-cream rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+        <ClientImage
+          src={product.image || '/images/placeholder.jpg'}
+          alt={product.imageAlt || product.name || 'Товар SirOyLi'}
+          width={300}
+          height={300}
+          className="w-full h-48 object-cover"
+          loading="eager"
+          sizes="(max-width: 768px) 50vw, 25vw"
+        />
+        <div className="p-4">
+          <h3 className="text-lg font-semibold text-dark-teal dark:text-text-dark">{product.name}</h3>
+          {product.price && (
+            <p className="text-accent-rose dark:text-primary-pink">
+              {product.price} TJS
+            </p>
+          )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
