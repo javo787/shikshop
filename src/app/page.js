@@ -21,9 +21,9 @@ export default async function Home() {
   // Загрузка данных о продуктах и категориях
   let apiData = [];
   try {
-    const res = await fetch('/api/products', {
-      cache: 'force-cache', // Динамический fetch с кэшированием
-    });
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/products`, {
+  cache: 'no-store',
+}); // Динамический fetch без кэширования
     if (!res.ok) throw new Error('Failed to fetch products');
     apiData = await res.json();
   } catch (error) {
@@ -53,9 +53,10 @@ export default async function Home() {
   // Загрузка данных о советах
   let tips = [];
   try {
-    const res = await fetch('/api/blogs', {
-      cache: 'force-cache', // Динамический fetch с кэшированием
-    });
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/blogs`, {
+      cache: 'no-store',
+    }); // Динамический fetch без кэширования
+
     if (!res.ok) throw new Error('Failed to fetch blogs');
     tips = await res.json();
   } catch (error) {
