@@ -22,7 +22,7 @@ export default async function Home() {
   let apiData = [];
   try {
     const res = await fetch('/api/products', {
-      cache: 'no-store', // Динамический fetch без кэширования
+      cache: 'force-cache', // Динамический fetch с кэшированием
     });
     if (!res.ok) throw new Error('Failed to fetch products');
     apiData = await res.json();
@@ -54,7 +54,7 @@ export default async function Home() {
   let tips = [];
   try {
     const res = await fetch('/api/blogs', {
-      cache: 'no-store', // Динамический fetch без кэширования
+      cache: 'force-cache', // Динамический fetch с кэшированием
     });
     if (!res.ok) throw new Error('Failed to fetch blogs');
     tips = await res.json();
