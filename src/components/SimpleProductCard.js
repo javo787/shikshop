@@ -9,7 +9,7 @@ export default function SimpleProductCard({ product, className, ...props }) {
       <div className="bg-white dark:bg-card-cream rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
         <ClientImage
           src={product.image || '/images/placeholder.jpg'}
-          alt={product.imageAlt || product.name || 'Товар SirOyLi'}
+          alt={product.imageAlt || product.name || 'Товар PARIZOD'}
           width={300}
           height={300}
           className="w-full h-48 object-cover"

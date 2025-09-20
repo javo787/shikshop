@@ -15,7 +15,7 @@ export default function ProductCard({ product, onQuickView }) {
         <div className="relative w-full h-64">
           <ClientImage
             src={product.image || '/images/placeholder.jpg'}
-            alt={product.imageAlt || product.name || 'Товар SirOyLi'}
+            alt={product.imageAlt || product.name || 'Товар PARIZOD'}
             fill
             className="object-contain"
             loading="eager"

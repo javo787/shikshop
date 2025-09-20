@@ -5,30 +5,27 @@ config({ path: '.env.local' });
 
 let conn = null;
 let gfs = null;
-let isConnecting = false; // Флаг для предотвращения параллельных подключений
+let isConnecting = false;
 
-// Функция для ожидания (используется для повторных попыток)
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function connectMongoDB(attempt = 1, maxAttempts = 3) {
+export async function connectMongoDB() {
   if (conn && gfs) {
     try {
       await conn.connection.db.command({ ping: 1 });
-      console.log('MongoDB уже подключен, ping успешен');
+      console.log('MongoDB уже подключен');
       return { conn, gfs };
     } catch (error) {
-      console.error('Ping не удался, сброс соединения:', error.message);
+      console.error('Ping не удался, сброс соединения');
       conn = null;
       gfs = null;
     }
   }
 
   if (isConnecting) {
-    console.log('Подключение уже в процессе, ожидание...');
-    while (isConnecting && attempt <= maxAttempts) {
-      await sleep(1000); // Ждем 1 секунду перед проверкой
-    }
-    if (conn && gfs) return { conn, gfs };
+    console.log('Подключение в процессе, ожидание...');
+    await sleep(500);
+    return connectMongoDB();
   }
 
   isConnecting = true;
@@ -38,52 +35,35 @@ export async function connectMongoDB(attempt = 1, maxAttempts = 3) {
       throw new Error('MONGODB_URI не указан в .env.local');
     }
 
-    console.log(`Попытка подключения к MongoDB (попытка ${attempt}/${maxAttempts})...`);
+    console.log('URI используется:', process.env.MONGODB_URI.substring(0, 50) + '...');
+    console.log('Подключение к MongoDB...');
     conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000, // Увеличенный таймаут выбора сервера
-      connectTimeoutMS: 15000, // Увеличенный таймаут подключения
-      socketTimeoutMS: 60000, // Увеличенный таймаут сокета
-      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 30000,
+      maxPoolSize: 5,
       appName: 'shikshak-shop',
     });
 
+    console.log('Соединение установлено, db:', conn.connection.db ? 'OK' : 'undefined');
     if (!conn.connection.db) {
       throw new Error('MongoDB connection database is undefined');
     }
 
     console.log('MongoDB подключен, инициализация GridFS...');
-    gfs = new mongoose.mongo.GridFSBucket(conn.connection.db, {
-      bucketName: 'images',
-    });
+    gfs = new mongoose.mongo.GridFSBucket(conn.connection.db, { bucketName: 'images' });
 
-    console.log('GridFS инициализирован, проверка коллекций...');
-    const collections = await conn.connection.db.listCollections().toArray();
-    const hasImagesFiles = collections.some(c => c.name === 'images.files');
-    const hasImagesChunks = collections.some(c => c.name === 'images.chunks');
-    console.log('Коллекция images.files существует:', hasImagesFiles);
-    console.log('Коллекция images.chunks существует:', hasImagesChunks);
-
-    if (!hasImagesFiles || !hasImagesChunks) {
-      throw new Error('GridFS collections missing');
-    }
-
+    console.log('GridFS инициализирован');
     await conn.connection.db.command({ ping: 1 });
     console.log('MongoDB ping успешен');
 
     isConnecting = false;
     return { conn, gfs };
   } catch (error) {
-    console.error(`Ошибка подключения MongoDB (попытка ${attempt}/${maxAttempts}):`, error.message);
+    console.error('Ошибка подключения MongoDB:', error.message);
     conn = null;
     gfs = null;
     isConnecting = false;
-
-    if (attempt < maxAttempts) {
-      console.log(`Повторная попытка подключения через 2 секунды...`);
-      await sleep(2000);
-      return connectMongoDB(attempt + 1, maxAttempts);
-    }
-
-    throw new Error(`Не удалось подключиться к MongoDB после ${maxAttempts} попыток: ${error.message}`);
+    throw error;
   }
 }

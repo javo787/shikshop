@@ -12,24 +12,26 @@ import { cookies } from 'next/headers';
 export const dynamic = 'force-dynamic';
 
 // Генерация мета-тегов
-export async function generateMetadata({ params: { locale } }) {
+export async function generateMetadata() {
+  const cookieStore = await cookies();
+  const locale = cookieStore.get('my_shikshop_locale')?.value || 'ru';
   const t = await getTranslations({ locale, namespace: 'home' });
 
   return {
-    title: t('metaTitle') || 'SirOyLi - Женская одежда в Душанбе',
+    title: t('metaTitle') || 'PARIZOD - Женская одежда в Душанбе',
     description: t('metaDescription') || 'Модная женская одежда в Душанбе. Платья, костюмы, аксессуары и многое другое. Бесплатная доставка по городу!',
-    keywords: t('metaKeywords') || 'женская одежда, мода, Душанбе, платья, костюмы, аксессуары, SirOyLi',
+    keywords: t('metaKeywords') || 'женская одежда, мода, Душанбе, платья, костюмы, аксессуары, PARIZOD',
     openGraph: {
-      title: t('metaTitle') || 'SirOyLi - Женская одежда',
+      title: t('metaTitle') || 'PARIZOD - Женская одежда',
       description: t('metaDescription') || 'Ознакомьтесь с нашей коллекцией стильной женской одежды в Душанбе.',
-      url: 'https://shikshop.vercel.app/', // Замените на https://SirOyLi.vercel.app/, если домен изменился
-      siteName: 'SirOyLi',
+      url: 'https://shikshop.vercel.app/',
+      siteName: 'PARIZOD',
       images: [
         {
           url: 'https://shikshop.vercel.app/images/og-image.jpg',
           width: 1200,
           height: 630,
-          alt: t('bannerAlt') || 'SirOyLi - Модная женская одежда',
+          alt: t('bannerAlt') || 'PARIZOD - Модная женская одежда',
         },
       ],
       locale: locale || 'ru_TJ',
@@ -37,25 +39,26 @@ export async function generateMetadata({ params: { locale } }) {
     },
     twitter: {
       card: 'summary_large_image',
-      title: t('metaTitle') || 'SirOyLi - Женская одежда',
+      title: t('metaTitle') || 'PARIZOD - Женская одежда',
       description: t('metaDescription') || 'Модная женская одежда в Душанбе.',
       images: ['https://shikshop.vercel.app/images/og-image.jpg'],
     },
   };
 }
 
-export default async function Home({ params: { locale = 'ru' } }) {
+export default async function Home() {
   const cookieStore = await cookies();
-  const userLocale = cookieStore.get('my_shikshop_locale')?.value || locale;
-  console.log('Home: locale =', userLocale);
+  const locale = cookieStore.get('my_shikshop_locale')?.value || 'ru';
+  console.log('Home: locale =', locale);
 
-  const t = await getTranslations({ locale: userLocale, namespace: 'home' });
+  const t = await getTranslations({ locale, namespace: 'home' });
 
   // Загрузка данных о продуктах и категориях
   let apiData = [];
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/products`, {
-      cache: 'no-store',
+      cache: 'force-cache', // Кэширование на 1 час
+      next: { revalidate: 3600 },
     });
     if (!res.ok) throw new Error('Failed to fetch products');
     apiData = await res.json();
@@ -71,9 +74,9 @@ export default async function Home({ params: { locale = 'ru' } }) {
       name: item.name || item.title || t('noName') || 'Без названия',
       description: item.description || '',
       image: item.image || '/images/placeholder.jpg',
-      imageAlt: item.name ? `${item.name} - ${t('categoryAlt')}` : t('categoryAlt') || 'Категория одежды SirOyLi',
+      imageAlt: item.name ? `${item.name} - ${t('categoryAlt')}` : t('categoryAlt') || 'Категория одежды PARIZOD',
     }))
-     .slice(0, 6); 
+    .slice(0, 6); 
   const products = apiData
     .filter(item => !item.type || (item.type !== 'collection' && item.type !== 'look'))
     .map((item, id) => ({
@@ -81,7 +84,7 @@ export default async function Home({ params: { locale = 'ru' } }) {
       name: item.name || item.title || t('noName') || 'Без названия',
       price: item.price || null,
       image: item.image || '/images/placeholder.jpg',
-      imageAlt: item.name ? `${item.name} - ${t('productAlt')}` : t('productAlt') || 'Товар SirOyLi',
+      imageAlt: item.name ? `${item.name} - ${t('productAlt')}` : t('productAlt') || 'Товар PARIZOD',
     }))
     .slice(0, 6); // Ограничиваем до 6 товаров
 
@@ -89,7 +92,8 @@ export default async function Home({ params: { locale = 'ru' } }) {
   let tips = [];
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/blogs`, {
-      cache: 'no-store',
+      cache: 'force-cache', // Кэширование на 1 час
+      next: { revalidate: 3600 },
     });
     if (!res.ok) throw new Error('Failed to fetch blogs');
     tips = await res.json();
@@ -99,9 +103,9 @@ export default async function Home({ params: { locale = 'ru' } }) {
   }
 
   const socialPosts = [
-    { id: 1, image: '/images/instagram1.jpg', alt: t('socialAlt') || 'SirOyLi в Instagram - Пост 1' },
-    { id: 2, image: '/images/instagram2.jpg', alt: t('socialAlt') || 'SirOyLi в Instagram - Пост 2' },
-    { id: 3, image: '/images/instagram3.jpg', alt: t('socialAlt') || 'SirOyLi в Instagram - Пост 3' },
+    { id: 1, image: '/images/instagram1.jpg', alt: t('socialAlt') || 'PARIZOD в Instagram - Пост 1' },
+    { id: 2, image: '/images/instagram2.jpg', alt: t('socialAlt') || 'PARIZOD в Instagram - Пост 2' },
+    { id: 3, image: '/images/instagram3.jpg', alt: t('socialAlt') || 'PARIZOD в Instagram - Пост 3' },
   ];
 
   return (
@@ -109,7 +113,7 @@ export default async function Home({ params: { locale = 'ru' } }) {
       <section className="relative h-110 sm:h-[80vh] overflow-hidden" data-aos="fade-up">
         <ClientImage
           src="/images/banner.jpg"
-          alt={t('bannerAlt') || 'SirOyLi - Главный баннер модной женской одежды'}
+          alt={t('bannerAlt') || 'PARIZOD - Главный баннер модной женской одежды'}
           fill
           className="object-cover w-full h-full z-0"
           priority
@@ -193,7 +197,7 @@ export default async function Home({ params: { locale = 'ru' } }) {
         <div className="relative h-64 max-w-7xl mx-auto rounded-lg overflow-hidden">
           <ClientImage
             src="/images/brand.jpg"
-            alt={t('brandAlt') || 'SirOyLi - О бренде'}
+            alt={t('brandAlt') || 'PARIZOD - О бренде'}
             width={1920}
             height={1080}
             className="object-cover z-0"
