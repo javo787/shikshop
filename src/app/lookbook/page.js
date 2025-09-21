@@ -1,35 +1,18 @@
-'use client';
+import LookbookClient from './LookbookClient';
 
-import { useState, useEffect } from 'react';
-import LookbookCard from '../../components/LookbookCard';
+export const metadata = {
+  title: 'Лукбук | PARIZOD - Галерея образов и стилей',
+  description: 'Просмотрите галерею модных образов и стилей от PARIZOD. Вдохновение для вашего гардероба с женской одеждой и аксессуарами.',
+  keywords: 'лукбук, образы, стили одежды, PARIZOD, модные луки, женская мода',
+  openGraph: {
+    title: 'Лукбук | PARIZOD',
+    description: 'Галерея вдохновляющих образов для стильных женщин.',
+    images: ['/og-image.jpg'], // Замени на реальный путь к изображению для OG (если есть)
+    url: 'https://shikshop.vercel.app/lookbook', // Замени на URL твоего сайта
+  },
+  robots: 'index, follow',
+};
 
-export default function Lookbook() {
-  const [looks, setLooks] = useState([]);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const fetchLooks = async () => {
-      try {
-        const res = await fetch('/api/lookbook');
-        if (!res.ok) throw new Error('Failed to fetch lookbook');
-        const data = await res.json();
-        setLooks(data);
-      } catch (err) {
-        setError('Ошибка загрузки лукбука');
-      }
-    };
-    fetchLooks();
-  }, []);
-
-  return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold text-text-dark mb-6">Лукбук</h1>
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {looks.map(look => (
-          <LookbookCard key={look._id} look={look} />
-        ))}
-      </div>
-    </div>
-  );
+export default function LookbookPage() {
+  return <LookbookClient />;
 }

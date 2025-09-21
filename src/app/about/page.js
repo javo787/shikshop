@@ -2,6 +2,19 @@ import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 
+export const metadata = {
+  title: 'О нас | PARIZOD - О бренде женской одежды и аксессуаров',
+  description: 'Узнайте больше о бренде PARIZOD: наша история, преимущества, коллекции и блог. Стильная женская одежда для современных женщин.',
+  keywords: 'о бренде, PARIZOD, женская одежда, история бренда, преимущества, блог о моде',
+  openGraph: {
+    title: 'О нас | PARIZOD',
+    description: 'История и преимущества бренда PARIZOD - стильная одежда для женщин.',
+    images: ['/og-image.jpg'], // Замени на реальный путь к изображению для OG (если есть)
+    url: 'https://shikshop.vercel.app/about', // Замени на URL твоего сайта
+  },
+  robots: 'index, follow',
+};
+
 export default async function About() {
   const cookieStore = await cookies();
   const locale = cookieStore.get('my_shikshop_locale')?.value || 'ru';

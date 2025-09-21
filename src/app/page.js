@@ -18,12 +18,12 @@ export async function generateMetadata() {
   const t = await getTranslations({ locale, namespace: 'home' });
 
   return {
-    title: t('metaTitle') || 'PARIZOD - Женская одежда в Душанбе',
-    description: t('metaDescription') || 'Модная женская одежда в Душанбе. Платья, костюмы, аксессуары и многое другое. Бесплатная доставка по городу!',
-    keywords: t('metaKeywords') || 'женская одежда, мода, Душанбе, платья, костюмы, аксессуары, PARIZOD',
+    title: t('metaTitle') || 'PARIZOD - Женская одежда в Таджикистане',
+    description: t('metaDescription') || 'Модная женская одежда в Таджикистане. Платья, костюмы, аксессуары и многое другое. Бесплатная доставка по городу!',
+    keywords: t('metaKeywords') || 'женская одежда, мода, Душанбе, платья, костюмы, аксессуары, курта, либос, харидан, мода2025, новости, Худжанд, Таджикистан, паризод, паризода, паризодшоп, parizod, PARIZOD',
     openGraph: {
       title: t('metaTitle') || 'PARIZOD - Женская одежда',
-      description: t('metaDescription') || 'Ознакомьтесь с нашей коллекцией стильной женской одежды в Душанбе.',
+      description: t('metaDescription') || 'Ознакомьтесь с нашей коллекцией стильной женской одежды в Таджикистане.',
       url: 'https://shikshop.vercel.app/',
       siteName: 'PARIZOD',
       images: [
@@ -40,7 +40,7 @@ export async function generateMetadata() {
     twitter: {
       card: 'summary_large_image',
       title: t('metaTitle') || 'PARIZOD - Женская одежда',
-      description: t('metaDescription') || 'Модная женская одежда в Душанбе.',
+      description: t('metaDescription') || 'Модная женская одежда в Таджикистане.',
       images: ['https://shikshop.vercel.app/images/og-image.jpg'],
     },
   };
