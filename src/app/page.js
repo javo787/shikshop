@@ -267,7 +267,7 @@ export default async function Home() {
           ))}
         </div>
         <p className="text-center mt-8">
-          <Link href="https://www.instagram.com/shik_shak_shop.tj/" target="_blank" className="text-accent-emerald hover:underline dark:text-text-light">
+          <Link href="https://www.instagram.com/parizod_tj/" target="_blank" className="text-accent-emerald hover:underline dark:text-text-light">
             {t('socialButton')}
           </Link>
         </p>
@@ -294,7 +294,7 @@ export default async function Home() {
             <p>{t('footerPhone')}</p>
             <p>{t('footerEmail')}</p>
             <div className="flex space-x-4 mt-4">
-              <a href="https://www.instagram.com/shik_shak_shop.tj/" target="_blank" className="hover:text-primary-pink dark:hover:text-secondary-peach">
+              <a href="https://www.instagram.com/parizod_tj/" target="_blank" className="hover:text-primary-pink dark:hover:text-secondary-peach">
                 <Icon name="instagram" className="w-6 h-6" />
               </a>
               <a href="https://whatsapp.com/channel/0029VbAeSyaAzNbnGuVFzZ1r" target="_blank" className="hover:text-primary-pink dark:hover:text-secondary-peach">

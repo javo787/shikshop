@@ -210,18 +210,6 @@ export default function AdminProducts() {
           onChange={(e) => setAdditionalImages(Array.from(e.target.files))}
           className="p-2 border rounded"
         />
-        <input
-          type="file"
-          multiple
-          onChange={(e) => setAdditionalImages(Array.from(e.target.files))}
-          className="p-2 border rounded"
-        />
-        <input
-          type="file"
-          multiple
-          onChange={(e) => setAdditionalImages(Array.from(e.target.files))}
-          className="p-2 border rounded"
-        />
         <button type="submit" className="bg-accent-rose text-text-light px-4 py-2 rounded">
           {editingId ? 'Обновить' : 'Добавить'}
         </button>

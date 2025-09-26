@@ -36,8 +36,8 @@ export default function ContactsClient() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
           <h2 className="text-2xl font-semibold text-text-dark mb-4">Свяжитесь с нами</h2>
-          <p className="text-text-gray mb-2">Email: <a href="mailto:info@shikshakshop.com" className="text-accent-rose">...</a></p>
-          <p className="text-text-gray mb-2">Телефон: <a href="tel:+992016960100" className="text-accent-rose">+992 01 696 0100</a></p>
+          <p className="text-text-gray mb-2">Email: <a href="mailto:parizod.tj@gmail.com" className="text-accent-rose">parizod.tj@gmail.com</a></p>
+          <p className="text-text-gray mb-2">Телефон: <a href="tel:+992877750009" className="text-accent-rose">+992 87 775 0009</a></p>
           <p className="text-text-gray mb-2">Адрес: г. Худжанд, ул. Гафурова, д. А376</p>
           <p className="text-text-gray">Часы работы: Пн-Пт, 9:00–18:00</p>
         </div>

@@ -9,12 +9,15 @@ export default function ProductCard({ product, onQuickView }) {
     return <div className="text-red-500 text-center">Ошибка: товар не найден</div>;
   }
 
+  // Prioritize imageLarge, then image, then first additional image
+  const displayImage = product.imageLarge || product.image || (product.additionalImages && product.additionalImages[0]) || '/images/placeholder.jpg';
+
   return (
     <div className="border rounded-lg overflow-hidden shadow-md">
       <Link href={`/product/${product._id}`}>
         <div className="relative w-full h-64">
           <ClientImage
-            src={product.image || '/images/placeholder.jpg'}
+            src={displayImage}
             alt={product.imageAlt || product.name || 'Товар PARIZOD'}
             fill
             className="object-contain"
