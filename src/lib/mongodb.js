@@ -4,21 +4,19 @@ import { config } from 'dotenv';
 config({ path: '.env.local' });
 
 let conn = null;
-let gfs = null;
 let isConnecting = false;
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function connectMongoDB() {
-  if (conn && gfs) {
+  if (conn) {
     try {
       await conn.connection.db.command({ ping: 1 });
       console.log('MongoDB уже подключен');
-      return { conn, gfs };
+      return { conn };
     } catch (error) {
       console.error('Ping не удался, сброс соединения');
       conn = null;
-      gfs = null;
     }
   }
 
@@ -50,19 +48,14 @@ export async function connectMongoDB() {
       throw new Error('MongoDB connection database is undefined');
     }
 
-    console.log('MongoDB подключен, инициализация GridFS...');
-    gfs = new mongoose.mongo.GridFSBucket(conn.connection.db, { bucketName: 'images' });
-
-    console.log('GridFS инициализирован');
     await conn.connection.db.command({ ping: 1 });
     console.log('MongoDB ping успешен');
 
     isConnecting = false;
-    return { conn, gfs };
+    return { conn };
   } catch (error) {
     console.error('Ошибка подключения MongoDB:', error.message);
     conn = null;
-    gfs = null;
     isConnecting = false;
     throw error;
   }

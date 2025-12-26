@@ -6,6 +6,7 @@ import { auth } from '../../../lib/firebase.js';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import ImageUpload from '../../../components/ImageUpload'; // Импорт компонента
 
 export default function AdminProducts() {
   const [name, setName] = useState('');
@@ -16,9 +17,9 @@ export default function AdminProducts() {
   const [material, setMaterial] = useState('');
   const [sizes, setSizes] = useState('');
   const [details, setDetails] = useState('');
-  const [image, setImage] = useState(null);
-  const [imageLarge, setImageLarge] = useState(null);
-  const [additionalImages, setAdditionalImages] = useState([]);
+  const [image, setImage] = useState(''); // Теперь URL
+  const [imageLarge, setImageLarge] = useState(''); // URL
+  const [additionalImages, setAdditionalImages] = useState([]); // Массив URL
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -51,25 +52,27 @@ export default function AdminProducts() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('description', description);
-    formData.append('price', price);
-    formData.append('category', category);
-    formData.append('type', type);
-    formData.append('material', material);
-    formData.append('sizes', sizes);
-    formData.append('details', details);
-    if (image) formData.append('image', image);
-    if (imageLarge) formData.append('imageLarge', imageLarge);
-    additionalImages.forEach((file) => formData.append('additionalImages', file));
+    const productData = {
+      name,
+      description,
+      price,
+      category,
+      type,
+      material,
+      sizes,
+      details,
+      image,
+      imageLarge,
+      additionalImages,
+    }; // Отправляем URL вместо файлов
 
     try {
       const url = editingId ? `/api/products/${editingId}` : '/api/products';
       const method = editingId ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,
-        body: formData,
+        headers: { 'Content-Type': 'application/json' }, // Теперь JSON, не FormData
+        body: JSON.stringify(productData),
       });
       if (!res.ok) throw new Error('Failed to save product');
       setSuccess(editingId ? 'Товар обновлён' : 'Товар добавлен');
@@ -92,9 +95,9 @@ export default function AdminProducts() {
     setSizes(product.sizes || '');
     setDetails(product.details || '');
     setEditingId(product._id);
-    setImage(null);
-    setImageLarge(null);
-    setAdditionalImages([]);
+    setImage(product.image || '');
+    setImageLarge(product.imageLarge || '');
+    setAdditionalImages(product.additionalImages || []);
   };
 
   const handleDelete = async (id) => {
@@ -120,8 +123,8 @@ export default function AdminProducts() {
     setMaterial('');
     setSizes('');
     setDetails('');
-    setImage(null);
-    setImageLarge(null);
+    setImage('');
+    setImageLarge('');
     setAdditionalImages([]);
     setEditingId(null);
   };
@@ -193,23 +196,21 @@ export default function AdminProducts() {
           onChange={(e) => setDetails(e.target.value)}
           className="p-2 border rounded"
         />
-        <input
-          type="file"
-          onChange={(e) => setImage(e.target.files[0])}
-          className="p-2 border rounded"
-          required={!editingId}
-        />
-        <input
-          type="file"
-          onChange={(e) => setImageLarge(e.target.files[0])}
-          className="p-2 border rounded"
-        />
-        <input
-          type="file"
-          multiple
-          onChange={(e) => setAdditionalImages(Array.from(e.target.files))}
-          className="p-2 border rounded"
-        />
+        <div>
+          <label>Основное изображение:</label>
+          <ImageUpload onUpload={(url) => setImage(url)} /> {/* Для image */}
+          {image && <p>Ссылка: {image}</p>}
+        </div>
+        <div>
+          <label>Большое изображение:</label>
+          <ImageUpload onUpload={(url) => setImageLarge(url)} /> {/* Для imageLarge */}
+          {imageLarge && <p>Ссылка: {imageLarge}</p>}
+        </div>
+        <div>
+          <label>Дополнительные изображения:</label>
+          <ImageUpload onUpload={(urls) => setAdditionalImages(urls)} multiple={true} /> {/* Multiple */}
+          {additionalImages.length > 0 && <p>Ссылки: {additionalImages.join(', ')}</p>}
+        </div>
         <button type="submit" className="bg-accent-rose text-text-light px-4 py-2 rounded">
           {editingId ? 'Обновить' : 'Добавить'}
         </button>
@@ -224,30 +225,31 @@ export default function AdminProducts() {
 
       <h2 className="text-2xl font-semibold mb-4">Список товаров</h2>
       <div className="grid grid-cols-1 gap-4">
-        {products.map((product) => (
-          <div key={product._id} className="p-4 border rounded">
-            <h3 className="text-xl font-medium">{product.name}</h3>
-            <p>{product.description}</p>
-            <p>Цена: {product.price || 'N/A'} ₽</p>
-            <p>Тип: {product.type}</p>
-            {product.image && (
-              <Image
-                src={product.image}
-                alt={product.name}
-                width={128}
-                height={128}
-                className="object-cover"
-              />
-            )}
-            <button onClick={() => handleEdit(product)} className="bg-primary-pink text-text-light px-2 py-1 rounded mr-2">
-              Редактировать
-            </button>
-            <button onClick={() => handleDelete(product._id)} className="bg-red-500 text-text-light px-2 py-1 rounded">
-              Удалить
-            </button>
-          </div>
-        ))}
-      </div>
+  {products.map((product) => (
+    <div key={product._id} className="p-4 border rounded">
+      <h3 className="text-xl font-medium">{product.name}</h3>
+      <p>{product.description}</p>
+      <p>Цена: {product.price || 'N/A'} ₽</p>
+      <p>Тип: {product.type}</p>
+      {product.image && (
+        <Image
+          src={product.image.startsWith('http') ? product.image : `/api/images/${product.image}`} // Проверка для совместимости
+          alt={product.name}
+          width={128}
+          height={128}
+          className="object-cover"
+        />
+      )}
+      <button onClick={() => handleEdit(product)} className="bg-primary-pink text-text-light px-2 py-1 rounded mr-2">
+        Редактировать
+      </button>
+      <button onClick={() => handleDelete(product._id)} className="bg-red-500 text-text-light px-2 py-1 rounded">
+        Удалить
+      </button>
+     </div>
+       ))}
+    </div>
+
     </div>
   );
 }

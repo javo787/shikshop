@@ -5,14 +5,14 @@ import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-
+import ImageUpload from '@/src/components/ImageUpload'; // Импорт компонента
 
 export default function AdminBlogs() {
   const t = useTranslations('admin');
   const [blogs, setBlogs] = useState([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [image, setImage] = useState(null);
+  const [image, setImage] = useState(''); // Теперь строка с URL
   const [date, setDate] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [user, setUser] = useState(null);
@@ -41,20 +41,9 @@ export default function AdminBlogs() {
     }
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result.split(',')[1]); // Extract base64 string
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const blogData = { title, content, image, date };
+    const blogData = { title, content, image, date }; // Отправляем URL вместо base64
 
     try {
       if (editingId) {
@@ -74,7 +63,7 @@ export default function AdminBlogs() {
       }
       setTitle('');
       setContent('');
-      setImage(null);
+      setImage('');
       setDate('');
       setEditingId(null);
       fetchBlogs();
@@ -86,7 +75,7 @@ export default function AdminBlogs() {
   const handleEdit = (blog) => {
     setTitle(blog.title);
     setContent(blog.content);
-    setImage(blog.image);
+    setImage(blog.image || ''); // URL
     setDate(blog.date);
     setEditingId(blog._id);
   };
@@ -121,8 +110,8 @@ export default function AdminBlogs() {
       <h1 className="text-3xl font-bold text-dark-teal dark:text-text-light mb-6">{t('blogsTitle')}</h1>
       <form onSubmit={handleSubmit} className="mb-8 max-w-2xl mx-auto">
         <Link href="/admin" className="text-accent-rose hover:underline mb-4 inline-block">
-                ← Назад в админ-панель
-              </Link>
+          ← Назад в админ-панель
+        </Link>
         <div className="mb-4">
           <label className="block text-dark-teal dark:text-text-light">{t('title')}</label>
           <input
@@ -145,12 +134,8 @@ export default function AdminBlogs() {
         </div>
         <div className="mb-4">
           <label className="block text-dark-teal dark:text-text-light">{t('image')}</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            className="w-full p-2 border rounded"
-          />
+          <ImageUpload onUpload={(url) => setImage(url)} /> {/* Новый компонент вместо input */}
+          {image && <p>Ссылка на изображение: {image}</p>} {/* Для отладки */}
         </div>
         <div className="mb-4">
           <label className="block text-dark-teal dark:text-text-light">{t('date')}</label>
@@ -167,37 +152,37 @@ export default function AdminBlogs() {
       </form>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        {blogs.map((blog) => (
-          <div key={blog._id} className="p-4 bg-secondary-peach dark:bg-accent-emerald rounded">
-            <h3 className="text-xl font-bold">{blog.title}</h3>
-            <p className="text-sm text-neutral-gray">{blog.date}</p>
-            <p>{blog.content.substring(0, 100)}...</p>
-            {blog.image && (
-              <img
-                src={`data:image/jpeg;base64,${blog.image}`}
-                alt={blog.title}
-                width={100}
-                height={50}
-                className="w-24 h-12 object-cover rounded mt-2"
-              />
-            )}
-            <div className="mt-2">
-              <button
-                onClick={() => handleEdit(blog)}
-                className="mr-2 bg-primary-pink text-text-light px-3 py-1 rounded hover:bg-accent-rose"
-              >
-                {t('edit')}
-              </button>
-              <button
-                onClick={() => handleDelete(blog._id)}
-                className="bg-red-500 text-text-light px-3 py-1 rounded hover:bg-red-600"
-              >
-                {t('delete')}
-              </button>
-            </div>
-          </div>
-        ))}
+  {blogs.map((blog) => (
+    <div key={blog._id} className="p-4 bg-secondary-peach dark:bg-accent-emerald rounded">
+      <h3 className="text-xl font-bold">{blog.title}</h3>
+      <p className="text-sm text-neutral-gray">{blog.date}</p>
+      <p>{blog.content.substring(0, 100)}...</p>
+      {blog.image && (
+        <img
+          src={blog.image.startsWith('http') ? blog.image : `data:image/jpeg;base64,${blog.image}`} // Для старых base64 или адаптируй, если GridFS
+          alt={blog.title}
+          width={100}
+          height={50}
+          className="w-24 h-12 object-cover rounded mt-2"
+        />
+      )}
+      <div className="mt-2">
+        <button
+          onClick={() => handleEdit(blog)}
+          className="mr-2 bg-primary-pink text-text-light px-3 py-1 rounded hover:bg-accent-rose"
+        >
+          {t('edit')}
+        </button>
+        <button
+          onClick={() => handleDelete(blog._id)}
+          className="bg-red-500 text-text-light px-3 py-1 rounded hover:bg-red-600"
+        >
+          {t('delete')}
+        </button>
       </div>
+    </div>
+  ))}
+</div> 
     </div>
   );
 }

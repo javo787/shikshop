@@ -16,7 +16,7 @@ const productSchema = new mongoose.Schema({
     type: String,
   },
   type: {
-    type: String, // "product", "collection", "look"
+    type: String,
     default: 'product',
   },
   style: {
@@ -32,17 +32,14 @@ const productSchema = new mongoose.Schema({
     type: String,
   },
   image: {
-    type: mongoose.Schema.Types.ObjectId, // Основное изображение
-    ref: 'fs.files',
+    type: String, // URL или старый ID как строка
     required: true,
   },
   imageLarge: {
-    type: mongoose.Schema.Types.ObjectId, // Большое изображение для collection/look
-    ref: 'fs.files',
+    type: String, // URL или старый ID
   },
   additionalImages: [{
-    type: mongoose.Schema.Types.ObjectId, // Дополнительные изображения
-    ref: 'fs.files',
+    type: String, // Массив URL или ID
   }],
   createdAt: {
     type: Date,

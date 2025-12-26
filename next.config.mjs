@@ -16,6 +16,12 @@ export default withNextIntl({
         hostname: 'shikshop.vercel.app',
         pathname: '/api/images/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        port: '',
+        pathname: '/dprydst2c/**', // Твой cloud name
+      },
     ],
   },
   webpack: (config) => {
