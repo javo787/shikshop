@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import ClientImage from '@/src/components/ClientImage';
+import ClientImage from '@/components/ClientImage'; // Исправлен путь
 
 // Генерация мета-тегов
 export async function generateMetadata() {

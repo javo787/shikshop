@@ -16,116 +16,89 @@
     "orderHistory": "История заказов"
   },
   "home": {
-    "metaTitle": "PARIZOD - Модная женская одежда в Таджикистане",
-    "metaDescription": "Ознакомьтесь с нашей коллекцией стильной женской одежды в Таджикистане: платья, костюмы, аксессуары и бесплатная доставка!",
-    "metaKeywords": "женская одежда, мода, Таджикистан, Худжанд, Душанбе, платья, костюмы, аксессуары, PARIZOD",
-    "categoryAlt": "Категория одежды PARIZOD",
-    "productAlt": "Товар PARIZOD",
-    "socialAlt": "PARIZOD в Instagram",
-    "errorTips": "Ошибка загрузки советов. Попробуйте позже.",
     "title": "Добро пожаловать в PARIZOD!",
+    "metaTitle": "PARIZOD - Модная женская одежда в Таджикистане",
+    "metaDescription": "Ознакомьтесь с нашей коллекцией стильной женской одежды.",
+    "metaKeywords": "женская одежда, мода, Таджикистан, PARIZOD",
     "bannerTitle": "Добро пожаловать в мир моды!",
     "bannerDescription": "Откройте для себя последние тренды и эксклюзивные коллекции.",
     "bannerButton": "Перейти в каталог",
     "bannerAlt": "Главный баннер",
     "freeShipping": "Бесплатная доставка при заказе от 399 сомони",
-    "productsTitle": "Новые товары",
     "categoriesTitle": "Популярные категории",
+    "productsTitle": "Новые товары",
+    "tipsTitle": "Модные советы",
+    "promoTitle": "Скидка 20% на первую покупку!",
+    "promoDescription": "Зарегистрируйтесь и получите скидку.",
+    "promoButton": "Купить сейчас",
+    "socialTitle": "Мы в Instagram",
+    "socialButton": "Подписаться",
     "brandTitle": "Станьте частью стиля",
     "brandDescription": "Создавайте уникальные образы с PARIZOD.",
     "brandButton": "Узнать больше",
     "brandAlt": "Баннер бренда",
-    "tipsTitle": "Модные советы",
-    "promoTitle": "Скидка 20% на первую покупку!",
-    "promoDescription": "Зарегистрируйтесь и получите скидку на ваш первый заказ.",
-    "promoButton": "Купить сейчас",
-    "socialTitle": "Мы в Instagram",
-    "socialButton": "Подписаться",
+    "viewAll": "Посмотреть все",
+    "viewAllRest": "Посмотреть остальные",
     "footerSubscribeTitle": "Подпишитесь на новости",
     "footerSubscribePlaceholder": "Введите ваш email",
     "footerSubscribeButton": "Подписаться",
     "footerContactTitle": "Контакты",
     "footerAddress": "г. Худжанд, ул. Гафурова, д. А376",
     "footerPhone": "+992 87 775 0009",
-    "footerEmail": "parizod.tj@gmail.com.",
+    "footerEmail": "parizod.tj@gmail.com",
     "footerLinksTitle": "Полезные ссылки",
     "footerCopyright": "© 2025 PARIZOD. Все права защищены.",
     "headerhome": "Главная",
     "headercatalog": "Каталог",
     "headerlookbook": "Лукбук",
     "headerabout": "О бренде",
-    "headercontacts": "Контакты", 
-    "headerlogin": "Вход",
-    "headerregister": "Регистрация",
-    "categories": {
-      "item1": { "name": "Платья", "description": "Элегантные платья для любого случая" },
-      "item2": { "name": "Аксессуары", "description": "Стильные дополнения к вашему образу" },
-      "item3": { "name": "Верхняя одежда", "description": "Тепло и мода в одном" }
-    },
-    "tips": {
-      "item1": { "title": "Совет 1", "description": "Как подобрать платье по фигуре" },
-      "item2": { "title": "Совет 2", "description": "Тренды аксессуаров 2025" }
-    },
-    "products": {
-      "item1": { "name": "Товар 1" },
-      "item2": { "name": "Товар 2" },
-      "item3": { "name": "Товар 3" },
-      "item4": { "name": "Товар 4" },
-      "item5": { "name": "Товар 5" },
-      "item6": { "name": "Товар 6" }
-    },
-    "viewAll": "Посмотреть все",
-    "viewAllRest": "Посмотреть остальные"
+    "headercontacts": "Контакты",
+    "noName": "Без названия",
+    "categoryAlt": "Категория",
+    "productAlt": "Товар",
+    "socialAlt": "Instagram пост",
+    "errorCategories": "Не удалось загрузить категории",
+    "errorProducts": "Не удалось загрузить товары",
+    "errorTips": "Не удалось загрузить советы"
   },
   "notFound": {
-    "metaTitle": "Страница не найдена - PARIZOD",
-    "metaDescription": "К сожалению, страница не найдена. PARIZOD находится в разработке, скоро добавим новые возможности!",
-    "metaKeywords": "PARIZOD, страница не найдена, женская одежда, Душанбе",
-    "imageAlt": "PARIZOD - Страница не найдена",
     "title": "404",
     "subtitle": "Страница не найдена",
-    "description": "Похоже, вы забрели не туда! PARIZOD активно развивается, и скоро мы добавим новые возможности. Вернитесь на главную, чтобы посмотреть наши коллекции!",
-    "button": "Вернуться на главную"
+    "description": "Похоже, вы забрели не туда!",
+    "button": "Вернуться на главную",
+    "metaTitle": "Страница не найдена",
+    "metaDescription": "Ошибка 404",
+    "imageAlt": "Ошибка 404"
   },
   "catalog": {
     "title": "Каталог товаров",
     "productsTitle": "Товары",
-    "filterLabel": "Фильтр по категории",
+    "filterLabel": "Фильтр",
     "filterAll": "Все",
     "filterCategory1": "Платья",
     "filterCategory2": "Аксессуары"
   },
   "product": {
-  "notFound": "Товар не найден"
-},
-"about": {
-    "greetingTitle": "Добро пожаловать в PARIZOD!",
-    "greetingDescription": "Мы создаём стильную и качественную одежду для современных женщин, которые ценят индивидуальность и комфорт.",
-    "aboutStoreTitle": "О нашем магазине",
-    "aboutStoreDescription": "PARIZOD — это интернет-магазин женской одежды, основанный в 2020 году. Наша миссия — вдохновлять женщин на создание уникальных образов, предлагая модные и качественные товары по доступным ценам.",
+    "notFound": "Товар не найден"
+  },
+  "about": {
+    "greetingTitle": "О нас",
+    "greetingDescription": "Мы создаём стиль.",
+    "aboutStoreTitle": "Наш магазин",
+    "aboutStoreDescription": "PARIZOD — это качество и стиль.",
     "brandAlt": "История бренда",
     "advantagesTitle": "Наши преимущества",
     "noBlogs": "Нет доступных блогов",
-    "advantages": {
-      "item1": { "title": "Качество", "description": "Мы используем только высококачественные материалы" },
-      "item2": { "title": "Стиль", "description": "Модные коллекции, вдохновлённые последними трендами" },
-      "item3": { "title": "Доступность", "description": "Конкурентные цены и регулярные акции" },
-      "item4": { "title": "Сервис", "description": "Быстрая доставка и отличная поддержка клиентов" }
-    },
     "blogsTitle": "Наши статьи",
-    "blogs": {
-      "item1": { "title": "Тренды 2025 года", "content": "Полное описание модных тенденций 2025 года..." },
-      "item2": { "title": "Как создать стильный образ", "content": "Советы по созданию уникального стиля..." }
+    "advantages": {
+        "item1": { "title": "Качество", "description": "Только лучшее." },
+        "item2": { "title": "Стиль", "description": "Тренды 2025." },
+        "item3": { "title": "Цена", "description": "Доступно всем." },
+        "item4": { "title": "Сервис", "description": "Быстрая доставка." }
     }
-},
-"admin": {
-  "blogsTitle": "Управление блогами",
-  "title": "Админ панель",
-  "content": "контент",
-  "image": "изображение",
-  "date": "дата",
-  "createBlog": "создать",
-  "edit": "редактировать",
-  "delete": "удалить"
-}
+  },
+  "admin": {
+    "title": "Админ панель",
+    "blogsTitle": "Управление блогами"
+  }
 }

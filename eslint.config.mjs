@@ -13,13 +13,10 @@ export default [
   ...compat.extends("next/core-web-vitals"),
   {
     rules: {
-      'no-unused-expressions': 'off', 
-      'import/no-anonymous-default-export': 'off', 
+      'no-unused-expressions': 'off',
+      'import/no-anonymous-default-export': 'off',
     },
-    env: {
-      browser: true,
-      node: true,
-      es2021: true,
-    },
+    // Блок env удален для совместимости с ESLint 9.
+    // next/core-web-vitals автоматически настраивает нужные глобальные переменные.
   },
 ];

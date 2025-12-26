@@ -8,33 +8,34 @@ export default function ClientImage({ src, alt, fill = false, width = 300, heigh
 
   const getValidSrc = (imageSrc) => {
     if (!imageSrc || typeof imageSrc !== 'string') {
-      console.log('ClientImage: src пустой → placeholder');
       return '/images/placeholder.jpg';
     }
 
-    // Если это уже полный Cloudinary URL — возвращаем как есть
-    if (imageSrc.startsWith('https://res.cloudinary.com')) {
-      console.log('ClientImage: полный Cloudinary URL →', imageSrc);
-      return imageSrc;
+    // 1. Убираем пробелы (это критично!)
+    const cleanSrc = imageSrc.trim();
+
+    // 2. Если это внешняя ссылка (Cloudinary, Google и т.д.) - возвращаем как есть
+    if (cleanSrc.startsWith('http')) {
+      return cleanSrc;
     }
 
-    // Если начинается с /api/images/ или /images/ — ок
-    if (imageSrc.startsWith('/api/images/') || imageSrc.startsWith('/images/')) {
-      return imageSrc;
+    // 3. Если это уже путь (начинается со слэша) - возвращаем как есть
+    if (cleanSrc.startsWith('/')) {
+      return cleanSrc;
     }
 
-    // Старый ID → /api/images/ID
-    console.log('ClientImage: старый ID → /api/images/' + imageSrc);
-    return `/api/images/${imageSrc}`;
+    // 4. Если это путь без слэша (например "images/banner.jpg")
+    if (cleanSrc.includes('/')) {
+      return `/${cleanSrc}`;
+    }
+
+    // 5. Иначе считаем, что это старый MongoDB ID
+    return `/api/images/${cleanSrc}`;
   };
 
   const initialSrc = getValidSrc(src);
+  // Если была ошибка загрузки, показываем заглушку
   const finalSrc = error ? '/images/placeholder.jpg' : initialSrc;
-
-  const handleError = () => {
-    console.log(`ClientImage: Ошибка загрузки ${src} → fallback`);
-    setError(true);
-  };
 
   return (
     <Image
@@ -44,7 +45,9 @@ export default function ClientImage({ src, alt, fill = false, width = 300, heigh
       width={!fill ? width : undefined}
       height={!fill ? height : undefined}
       className={className}
-      onError={handleError}
+      onError={() => setError(true)}
+      // Важно: unoptimized нужен для внешних ссылок, чтобы Next.js не ломался
+      unoptimized={finalSrc.startsWith('http')}
       {...props}
     />
   );

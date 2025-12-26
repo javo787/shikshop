@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import ClientImage from '../../../components/ClientImage';
+import ClientImage from '@/components/ClientImage'; // Убедись, что путь правильный (без src если настроил jsconfig)
 import Link from 'next/link';
-import ProductCard from '../../../components/ProductCard';
+import ProductCard from '@/components/ProductCard'; // Исправлен путь
+import TryOnModal from '@/components/TryOnModal'; // 👈 Наш новый компонент
 
 // Простая функция форматирования даты
 const formatDate = (dateString) => {
@@ -13,25 +14,29 @@ const formatDate = (dateString) => {
 };
 
 export default function ProductClient({ product, similarProducts, reviews }) {
+  // --- Состояния ---
   const [error, setError] = useState(null);
+  
+  // Состояния отзывов
   const [reviewError, setReviewError] = useState(null);
   const [reviewSuccess, setReviewSuccess] = useState(null);
   const [userName, setUserName] = useState('');
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+
+  // Состояния галереи
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const modalRef = useRef(null);
 
-  // Состояния для примерки
-  const [showTryOnModal, setShowTryOnModal] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState(null);
+  // Состояние для Виртуальной примерки (Новое)
+  const [isTryOnOpen, setIsTryOnOpen] = useState(false); 
 
-  // Массив изображений (Cloudinary или старый путь)
+  // --- Логика ---
+
+  // Массив изображений
   const images = useMemo(() => {
     const list = [];
-
     if (product?.imageLarge && typeof product.imageLarge === 'string') {
       list.push(product.imageLarge);
     }
@@ -43,9 +48,7 @@ export default function ProductClient({ product, similarProducts, reviews }) {
         if (typeof img === 'string') list.push(img);
       });
     }
-
     if (list.length === 0) list.push('/images/placeholder.jpg');
-
     return list;
   }, [product]);
 
@@ -113,54 +116,6 @@ export default function ProductClient({ product, similarProducts, reviews }) {
     }
   };
 
-  // Функции для примерки
-  const handleTryOn = () => {
-    setShowTryOnModal(true);
-    setGeneratedImage(null);
-  };
-
-  const handleUserPhotoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setGenerating(true);
-    setGeneratedImage(null);
-
-    // Загружаем фото пользователя в Cloudinary
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', 'shikshop_unsigned');
-
-    try {
-      const uploadRes = await fetch('https://api.cloudinary.com/v1_1/dprydst2c/image/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!uploadRes.ok) throw new Error('Ошибка загрузки фото');
-      const uploadData = await uploadRes.json();
-      const personUrl = uploadData.secure_url;
-
-      // Отправляем на наш API
-      const aiRes = await fetch('/api/try-on', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          personImage: personUrl,
-          garmentImage: images[0] || product.image, // Главное фото одежды
-        }),
-      });
-
-      if (!aiRes.ok) throw new Error('Ошибка AI-примерки');
-      const { image } = await aiRes.json();
-      setGeneratedImage(image);
-    } catch (err) {
-      console.error(err);
-      alert('Не удалось сгенерировать примерку. Попробуйте позже.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
   if (!product) {
     return <div className="text-center py-20">Товар не найден</div>;
   }
@@ -168,7 +123,8 @@ export default function ProductClient({ product, similarProducts, reviews }) {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="grid md:grid-cols-2 gap-8">
-        {/* Галерея */}
+        
+        {/* --- ЛЕВАЯ КОЛОНКА: ГАЛЕРЕЯ --- */}
         <div>
           <div className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-zoom-in" onClick={handleImageClick}>
             <ClientImage
@@ -201,18 +157,19 @@ export default function ProductClient({ product, similarProducts, reviews }) {
             </div>
           )}
 
-          {/* Кнопка примерки */}
+          {/* Кнопка примерки (Теперь открывает новый компонент) */}
           <div className="mt-6 text-center">
             <button
-              onClick={handleTryOn}
-              className="bg-accent-rose text-white px-8 py-3 rounded-lg hover:bg-primary-pink transition text-lg"
+              onClick={() => setIsTryOnOpen(true)}
+              className="w-full md:w-auto bg-gradient-to-r from-accent-rose to-primary-pink text-white px-8 py-3 rounded-lg hover:shadow-lg hover:scale-105 transition-all text-lg font-medium flex items-center justify-center gap-2 mx-auto"
             >
-              ✨ Примерить онлайн
+              <span>✨</span> Примерить онлайн
             </button>
+            <p className="text-xs text-gray-500 mt-2">Примерьте этот наряд на своё фото с помощью AI</p>
           </div>
         </div>
 
-        {/* Информация */}
+        {/* --- ПРАВАЯ КОЛОНКА: ИНФОРМАЦИЯ --- */}
         <div>
           <h1 className="text-3xl font-bold text-text-dark mb-4">{product.name}</h1>
           <p className="text-2xl font-semibold text-accent-rose mb-6">
@@ -221,61 +178,69 @@ export default function ProductClient({ product, similarProducts, reviews }) {
 
           <div className="mb-6">
             <h3 className="font-semibold mb-2">Описание</h3>
-            <ul className="list-disc pl-5 space-y-2">
+            <ul className="list-disc pl-5 space-y-2 text-gray-700 dark:text-gray-300">
               {product.description.split('. ').filter(Boolean).map((point, i) => (
                 <li key={i}>{point}</li>
               ))}
             </ul>
           </div>
 
-          {product.material && <p><strong>Материал:</strong> {product.material}</p>}
-          {product.sizes && <p><strong>Размеры:</strong> {product.sizes}</p>}
-          {product.details && <p><strong>Детали:</strong> {product.details}</p>}
+          {product.material && <p className="mb-2"><strong>Материал:</strong> {product.material}</p>}
+          {product.sizes && <p className="mb-2"><strong>Размеры:</strong> {product.sizes}</p>}
+          {product.details && <p className="mb-2"><strong>Детали:</strong> {product.details}</p>}
 
-          {/* Отзывы */}
-          <div className="mt-12">
+          {/* Секция Отзывов */}
+          <div className="mt-12 border-t pt-8">
             <h2 className="text-2xl font-bold mb-4">Отзывы</h2>
-            <form onSubmit={handleReviewSubmit} className="flex flex-col gap-4 mb-8 max-w-md">
+            
+            <form onSubmit={handleReviewSubmit} className="flex flex-col gap-4 mb-8 max-w-md bg-gray-50 p-4 rounded-lg dark:bg-gray-800">
+              <h3 className="font-medium">Оставить отзыв</h3>
               <input
                 type="text"
                 placeholder="Ваше имя"
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
-                className="p-2 border rounded"
+                className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
                 required
               />
-              <select
-                value={rating}
-                onChange={(e) => setRating(Number(e.target.value))}
-                className="p-2 border rounded"
-              >
-                {[1, 2, 3, 4, 5].map(r => <option key={r} value={r}>{r} ★</option>)}
-              </select>
+              <div className="flex items-center gap-2">
+                <span>Оценка:</span>
+                <select
+                  value={rating}
+                  onChange={(e) => setRating(Number(e.target.value))}
+                  className="p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                >
+                  {[5, 4, 3, 2, 1].map(r => <option key={r} value={r}>{r} ★</option>)}
+                </select>
+              </div>
               <textarea
-                placeholder="Ваш отзыв"
+                placeholder="Ваш комментарий..."
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                className="p-2 border rounded h-24"
+                className="p-2 border rounded h-24 dark:bg-gray-700 dark:border-gray-600"
                 required
               />
-              <button type="submit" className="bg-accent-rose text-white px-4 py-2 rounded">
-                Отправить
+              <button type="submit" className="bg-dark-teal text-white px-4 py-2 rounded hover:bg-teal-700 transition">
+                Отправить отзыв
               </button>
-              {reviewError && <p className="text-red-500">{reviewError}</p>}
-              {reviewSuccess && <p className="text-green-500">{reviewSuccess}</p>}
+              {reviewError && <p className="text-red-500 text-sm">{reviewError}</p>}
+              {reviewSuccess && <p className="text-green-500 text-sm">{reviewSuccess}</p>}
             </form>
 
             <div className="space-y-4">
               {reviews.length > 0 ? (
                 reviews.map(r => (
-                  <div key={r._id} className="p-4 border rounded">
-                    <p><strong>{r.userName}</strong> ({r.rating} ★)</p>
-                    <p>{r.comment}</p>
-                    <p className="text-sm text-gray-500">{formatDate(r.createdAt)}</p>
+                  <div key={r._id} className="p-4 border rounded bg-white dark:bg-gray-800 shadow-sm">
+                    <div className="flex justify-between items-start">
+                        <p className="font-bold text-dark-teal dark:text-gray-200">{r.userName}</p>
+                        <span className="text-yellow-500 font-bold">{r.rating} ★</span>
+                    </div>
+                    <p className="text-gray-700 dark:text-gray-300 mt-1">{r.comment}</p>
+                    <p className="text-xs text-gray-400 mt-2">{formatDate(r.createdAt)}</p>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500">Отзывов пока нет</p>
+                <p className="text-gray-500 italic">Отзывов пока нет. Будьте первыми!</p>
               )}
             </div>
           </div>
@@ -284,8 +249,8 @@ export default function ProductClient({ product, similarProducts, reviews }) {
 
       {/* Похожие товары */}
       {similarProducts.length > 0 && (
-        <div className="mt-16">
-          <h2 className="text-2xl font-bold mb-6">Похожие товары</h2>
+        <div className="mt-16 border-t pt-8">
+          <h2 className="text-2xl font-bold mb-6 text-center">Вам может понравиться</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {similarProducts.map(p => (
               <ProductCard key={p._id} product={p} />
@@ -298,20 +263,20 @@ export default function ProductClient({ product, similarProducts, reviews }) {
       {isFullScreen && (
         <div
           ref={modalRef}
-          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 backdrop-blur-sm"
           tabIndex={-1}
         >
           <button
             onClick={handleCloseFullScreen}
-            className="absolute top-4 right-4 text-white text-4xl"
+            className="absolute top-4 right-4 text-white text-5xl hover:text-gray-300 transition"
           >
             ×
           </button>
 
           {images.length > 1 && (
             <>
-              <button onClick={handlePrevImage} className="absolute left-4 text-white text-4xl">←</button>
-              <button onClick={handleNextImage} className="absolute right-4 text-white text-4xl">→</button>
+              <button onClick={handlePrevImage} className="absolute left-4 text-white text-5xl hover:scale-110 transition p-2">‹</button>
+              <button onClick={handleNextImage} className="absolute right-4 text-white text-5xl hover:scale-110 transition p-2">›</button>
             </>
           )}
 
@@ -320,39 +285,18 @@ export default function ProductClient({ product, similarProducts, reviews }) {
             alt={product.name}
             width={1200}
             height={1200}
-            className="max-w-[90vw] max-h-[90vh] object-contain"
+            className="max-w-[95vw] max-h-[95vh] object-contain"
           />
         </div>
       )}
 
-      {/* Модальное окно примерки */}
-      {showTryOnModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-lg max-w-lg w-full relative">
-            <button
-              onClick={() => setShowTryOnModal(false)}
-              className="absolute top-2 right-4 text-2xl font-bold"
-            >
-              ×
-            </button>
-            <h2 className="text-2xl font-bold mb-4 text-center">Примерить онлайн</h2>
-            <p className="mb-4 text-center">Загрузите своё фото (лучше в полный рост)</p>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleUserPhotoUpload}
-              className="block mx-auto mb-4"
-            />
-            {generating && <p className="text-center text-blue-600">Генерация... (30–60 сек)</p>}
-            {generatedImage && (
-              <div className="mt-4">
-                <img src={generatedImage} alt="Результат примерки" className="w-full rounded shadow" />
-                <p className="text-sm text-gray-500 text-center mt-2">Powered by PARIZOD AI</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* 👇 НОВЫЙ КОМПОНЕНТ: Модальное окно примерки */}
+      <TryOnModal 
+        isOpen={isTryOnOpen} 
+        onClose={() => setIsTryOnOpen(false)} 
+        garmentImage={images[currentImageIndex] || product.image} // Берем текущее выбранное фото
+      />
+      
     </div>
   );
 }

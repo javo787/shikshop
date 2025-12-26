@@ -1,11 +1,11 @@
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
-import ClientImage from '@/src/components/ClientImage';
-import PromoBanner from '@/src/components/PromoBanner';
-import SimpleProductCard from '@/src/components/SimpleProductCard';
-import CategoryCard from '@/src/components/CategoryCard';
-import TipCard from '@/src/components/TipCard';
-import Icon from '@/src/components/Icon';
+import ClientImage from '@/components/ClientImage'; // Исправлен путь
+import PromoBanner from '@/components/PromoBanner'; // Исправлен путь
+import SimpleProductCard from '@/components/SimpleProductCard'; // Исправлен путь
+import CategoryCard from '@/components/CategoryCard'; // Исправлен путь
+import TipCard from '@/components/TipCard'; // Исправлен путь
+import Icon from '@/components/Icon'; // Исправлен путь
 import { cookies } from 'next/headers';
 
 // Заставляем страницу рендериться динамически

@@ -1,7 +1,4 @@
 import mongoose from 'mongoose';
-import { config } from 'dotenv';
-
-config({ path: '.env.local' });
 
 let conn = null;
 let isConnecting = false;
@@ -40,7 +37,7 @@ export async function connectMongoDB() {
       connectTimeoutMS: 10000,
       socketTimeoutMS: 30000,
       maxPoolSize: 5,
-      appName: 'shikshak-shop',
+      appName: 'shikshop',
     });
 
     console.log('Соединение установлено, db:', conn.connection.db ? 'OK' : 'undefined');
