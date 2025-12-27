@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ClientImage from '@/components/ClientImage';
 import Link from 'next/link';
 import ProductCard from '@/components/ProductCard';
@@ -39,14 +39,15 @@ export default function ProductClient({ product, similarProducts, reviews }) {
 
   const handleThumbnailClick = (index) => setCurrentImageIndex(index);
   const handleImageClick = () => setIsFullScreen(true);
-  const handleCloseFullScreen = () => setIsFullScreen(false);
+  const handleCloseFullScreen = useCallback(() => setIsFullScreen(false), []);
 
-  const handleKeyDown = (e) => {
+
+  const handleKeyDown = useCallback((e) => {
     if (!isFullScreen) return;
     if (e.key === 'Escape') handleCloseFullScreen();
     if (e.key === 'ArrowLeft') setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
     if (e.key === 'ArrowRight') setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-  };
+  }, [isFullScreen, images.length, handleCloseFullScreen]);
 
   useEffect(() => {
     if (isFullScreen) {
@@ -60,7 +61,7 @@ export default function ProductClient({ product, similarProducts, reviews }) {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'auto';
     };
-  }, [isFullScreen]);
+  }, [isFullScreen, handleKeyDown]);
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();

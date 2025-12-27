@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 import ImageUpload from '@/components/ImageUpload'; // Импорт компонента
 
 export default function AdminBlogs() {
@@ -156,9 +157,8 @@ export default function AdminBlogs() {
     <div key={blog._id} className="p-4 bg-secondary-peach dark:bg-accent-emerald rounded">
       <h3 className="text-xl font-bold">{blog.title}</h3>
       <p className="text-sm text-neutral-gray">{blog.date}</p>
-      <p>{blog.content.substring(0, 100)}...</p>
       {blog.image && (
-        <img
+        <Image
           src={blog.image.startsWith('http') ? blog.image : `data:image/jpeg;base64,${blog.image}`} // Для старых base64 или адаптируй, если GridFS
           alt={blog.title}
           width={100}
