@@ -11,30 +11,34 @@ export default function ClientImage({ src, alt, fill = false, width = 300, heigh
       return '/images/placeholder.jpg';
     }
 
-    // 1. Убираем пробелы (это критично!)
-    const cleanSrc = imageSrc.trim();
+    let cleanSrc = imageSrc.trim();
 
-    // 2. Если это внешняя ссылка (Cloudinary, Google и т.д.) - возвращаем как есть
+    // 🚑 ЭКСТРЕННАЯ ПОМОЩЬ: Удаляем двойной префикс, если он есть
+    // Если ссылка выглядит как "/api/images/https://...", мы убираем начало
+    if (cleanSrc.includes('/api/images/http')) {
+      cleanSrc = cleanSrc.replace('/api/images/', '');
+    }
+
+    // Теперь, если это http - возвращаем
     if (cleanSrc.startsWith('http')) {
       return cleanSrc;
     }
 
-    // 3. Если это уже путь (начинается со слэша) - возвращаем как есть
-    if (cleanSrc.startsWith('/')) {
+    // Если это локальный путь (/images/...)
+    if (cleanSrc.startsWith('/images/')) {
       return cleanSrc;
     }
 
-    // 4. Если это путь без слэша (например "images/banner.jpg")
-    if (cleanSrc.includes('/')) {
-      return `/${cleanSrc}`;
+    // Если это уже правильный API путь (но не двойной)
+    if (cleanSrc.startsWith('/api/images/')) {
+      return cleanSrc;
     }
 
-    // 5. Иначе считаем, что это старый MongoDB ID
+    // Если это просто ID (нет слэшей), добавляем префикс
     return `/api/images/${cleanSrc}`;
   };
 
   const initialSrc = getValidSrc(src);
-  // Если была ошибка загрузки, показываем заглушку
   const finalSrc = error ? '/images/placeholder.jpg' : initialSrc;
 
   return (
@@ -46,8 +50,7 @@ export default function ClientImage({ src, alt, fill = false, width = 300, heigh
       height={!fill ? height : undefined}
       className={className}
       onError={() => setError(true)}
-      // Важно: unoptimized нужен для внешних ссылок, чтобы Next.js не ломался
-      unoptimized={finalSrc.startsWith('http')}
+      unoptimized={finalSrc.startsWith('http')} 
       {...props}
     />
   );

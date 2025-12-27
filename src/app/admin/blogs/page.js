@@ -1,11 +1,11 @@
 'use client';
 
-import { auth } from '@/src/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import ImageUpload from '@/src/components/ImageUpload'; // Импорт компонента
+import ImageUpload from '@/components/ImageUpload'; // Импорт компонента
 
 export default function AdminBlogs() {
   const t = useTranslations('admin');

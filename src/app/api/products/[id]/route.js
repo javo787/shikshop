@@ -1,59 +1,70 @@
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
-import { connectMongoDB } from '../../../../lib/mongodb';
-import Product from '../../../../models/Product';
+import { connectMongoDB } from '@/lib/mongodb';
+import Product from '@/models/Product';
 
 export async function GET(req, { params }) {
   try {
     await connectMongoDB();
-    const { id } = params;
+    const { id } = await params;
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid product ID' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
+
     const product = await Product.findById(id);
+
     if (!product) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    return NextResponse.json(product);
+
+    // 👇 МОЩНАЯ ФУНКЦИЯ ОЧИСТКИ
+    const fixImage = (img) => {
+      if (!img) return null;
+      let clean = img.toString().trim();
+
+      if (clean.includes('/api/images/http')) {
+        clean = clean.replace('/api/images/', '');
+      }
+
+      if (clean.startsWith('http') || clean.startsWith('/')) return clean;
+      return `/api/images/${clean}`;
+    };
+
+    const p = product.toObject();
+    const enhancedProduct = {
+      ...p,
+      _id: p._id.toString(),
+      image: fixImage(p.image),
+      imageLarge: fixImage(p.imageLarge),
+      additionalImages: p.additionalImages?.map(fixImage) || []
+    };
+
+    return NextResponse.json(enhancedProduct);
   } catch (error) {
-    console.error('Error fetching product:', error.message);
-    return NextResponse.json({ error: 'Failed to fetch product', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
 
 export async function PUT(req, { params }) {
   try {
     await connectMongoDB();
-    const { id } = params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid product ID' }, { status: 400 });
-    }
-    const productData = await req.json(); // JSON с URL
-    const updatedProduct = await Product.findByIdAndUpdate(id, productData, { new: true });
-    if (!updatedProduct) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-    }
-    return NextResponse.json(updatedProduct);
+    const { id } = await params;
+    const data = await req.json();
+    const updated = await Product.findByIdAndUpdate(id, data, { new: true });
+    return NextResponse.json(updated);
   } catch (error) {
-    console.error('Error updating product:', error.message);
-    return NextResponse.json({ error: 'Failed to update product', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
 
 export async function DELETE(req, { params }) {
   try {
     await connectMongoDB();
-    const { id } = params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid product ID' }, { status: 400 });
-    }
-    const deletedProduct = await Product.findByIdAndDelete(id);
-    if (!deletedProduct) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-    }
-    return NextResponse.json({ message: 'Product deleted' });
+    const { id } = await params;
+    await Product.findByIdAndDelete(id);
+    return NextResponse.json({ message: 'Deleted' });
   } catch (error) {
-    console.error('Error deleting product:', error.message);
-    return NextResponse.json({ error: 'Failed to delete product', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }

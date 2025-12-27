@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { NextResponse } from 'next/server';
-import { connectMongoDB } from '@/src/lib/mongodb';
+import { connectMongoDB } from '@/lib/mongodb';
 
 export async function GET(request, { params }) {
   const { id } = await params; // Await params to access id

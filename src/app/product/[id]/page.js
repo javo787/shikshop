@@ -1,14 +1,16 @@
 import ProductClient from './ProductClient';
 import { Suspense } from 'react';
 
+// Вспомогательная функция для повторных запросов (если сеть моргнула)
 async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
   for (let i = 0; i < retries; i++) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // Timeout 5 сек
-      const fullUrl = `${process.env.NEXT_PUBLIC_BASE_URL}${url}`; // Абсолютный URL
-      const res = await fetch(fullUrl, { ...options, signal: controller.signal });
-      clearTimeout(timeoutId);
+      // Используем полный URL для серверных запросов
+      const fullUrl = url.startsWith('http') 
+        ? url 
+        : `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}${url}`;
+        
+      const res = await fetch(fullUrl, options);
       if (!res.ok) throw new Error(`Failed with status ${res.status}`);
       return res;
     } catch (err) {
@@ -19,69 +21,104 @@ async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
   }
 }
 
+// 1. ГЕНЕРАЦИЯ МЕТА-ТЕГОВ (SEO и ссылки для соцсетей)
 export async function generateMetadata({ params }) {
   const resolvedParams = await params;
   const { id } = resolvedParams;
+
   try {
     const res = await fetchWithRetry(`/api/products/${id}`, { next: { revalidate: 3600 } });
     const product = await res.json();
+
+    // 👇 ИСПРАВЛЕНИЕ: Проверяем, является ли ссылка внешней
+    const imageUrl = product.image && product.image.startsWith('http')
+      ? product.image
+      : `/api/images/${product.image}`;
+
     return {
-      title: `${product.name} | PARIZOD - Купить женскую одежду`,
-      description: product.description || 'Описание товара PARIZOD: стильная женская одежда, характеристики и отзывы.',
-      keywords: `купить ${product.name}, женская одежда, PARIZOD, цена ${product.price}`,
+      title: `${product.name} | PARIZOD`,
+      description: product.description ? product.description.slice(0, 160) : 'Модная женская одежда',
       openGraph: {
-        title: `${product.name} | PARIZOD`,
-        description: product.description,
-        images: [product.image || '/og-image.jpg'],
-        url: `https://shikshop.vercel.app/product/${id}`,
+        title: product.name,
+        description: product.description ? product.description.slice(0, 160) : 'Купить в PARIZOD',
+        images: [
+          {
+            url: imageUrl, // Теперь ссылка будет правильной
+            width: 800,
+            height: 600,
+            alt: product.name,
+          },
+        ],
       },
-      robots: 'index, follow',
-      metadataBase: new URL('http://localhost:3000'), // Добавлено для OG
     };
-  } catch (err) {
-    console.error('Metadata error:', err.message);
+  } catch (error) {
+    console.error('Metadata error:', error);
     return {
       title: 'Товар не найден | PARIZOD',
-      description: 'Ошибка загрузки товара.',
-      metadataBase: new URL('http://localhost:3000'),
+      description: 'К сожалению, этот товар недоступен.',
     };
   }
 }
 
-export default async function ProductPage({ params }) {
+// 2. ОСНОВНАЯ СТРАНИЦА
+export default async function Page({ params }) {
   const resolvedParams = await params;
   const { id } = resolvedParams;
+  
   let product = null;
   let similarProducts = [];
   let reviews = [];
   let error = null;
 
   try {
-    // Fetch продукта
-    const productRes = await fetchWithRetry(`/api/products/${id}`, { next: { revalidate: 3600 } });
+    // Загрузка товара
+    const productRes = await fetchWithRetry(`/api/products/${id}`, { cache: 'no-store' });
     product = await productRes.json();
 
-    // Fetch похожих
-    if (product.category || product.type) {
-      const similarRes = await fetchWithRetry(
-        `/api/products?category=${encodeURIComponent(product.category || '')}&type=${encodeURIComponent(product.type || '')}`,
-        { next: { revalidate: 3600 } }
-      );
-      const similarData = await similarRes.json();
-      similarProducts = similarData.filter((p) => p._id !== id).slice(0, 4);
-    }
+    // Загрузка похожих товаров
+    if (product) {
+      try {
+        const category = product.category ? encodeURIComponent(product.category) : '';
+        const type = product.type ? encodeURIComponent(product.type) : '';
+        const similarRes = await fetchWithRetry(
+          `/api/products?category=${category}&type=${type}`, 
+          { next: { revalidate: 3600 } }
+        );
+        const similarData = await similarRes.json();
+        // Убираем текущий товар из похожих
+        similarProducts = similarData.filter((p) => p._id !== id).slice(0, 4);
+      } catch (e) {
+        console.error('Error fetching similar products:', e);
+      }
 
-    // Fetch отзывов
-    const reviewsRes = await fetchWithRetry(`/api/reviews?productId=${id}`, { next: { revalidate: 3600 } });
-    reviews = await reviewsRes.json();
+      // Загрузка отзывов
+      try {
+        const reviewsRes = await fetchWithRetry(`/api/reviews?productId=${id}`, { cache: 'no-store' });
+        reviews = await reviewsRes.json();
+      } catch (e) {
+        console.error('Error fetching reviews:', e);
+      }
+    }
   } catch (err) {
-    console.error('Page fetch error:', err.message);
-    error = 'Ошибка загрузки товара. Проверьте соединение или ID товара.';
+    console.error('Page loading error:', err);
+    error = 'Не удалось загрузить информацию о товаре.';
+  }
+
+  if (error || !product) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-red-500">
+        {error || 'Товар не найден'}
+      </div>
+    );
   }
 
   return (
-    <Suspense fallback={<div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div></div>}>
-      {error ? <div className="text-red-500 text-center">{error}</div> : <ProductClient product={product} similarProducts={similarProducts} reviews={reviews} />}
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
+      <ProductClient 
+        product={product} 
+        similarProducts={similarProducts} 
+        reviews={reviews} 
+      />
     </Suspense>
   );
 }
