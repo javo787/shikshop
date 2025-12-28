@@ -3,11 +3,25 @@ import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
+// 👇👇👇 НАЧАЛО ШПИОНСКОЙ ПРОВЕРКИ 👇👇👇
+// Этот блок напишет в логах Vercel, видит ли он твой токен на самом деле.
+const token = process.env.REPLICATE_API_TOKEN;
+console.log("🔍 [DEBUG] Токен загружен?", token ? "ДА" : "НЕТ (NULL/UNDEFINED)");
+
+if (token) {
+    // Показываем первые 3 буквы, чтобы убедиться, что это правильный токен (должен быть "r8_")
+    console.log("🔍 [DEBUG] Первые 3 символа:", token.substring(0, 3));
+    console.log("🔍 [DEBUG] Длина токена:", token.length);
+} else {
+    console.error("❌ [CRITICAL] ТОКЕН ОТСУТСТВУЕТ! Vercel его не видит.");
+}
+// 👆👆👆 КОНЕЦ ПРОВЕРКИ 👆👆👆
+
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
-// 1. ЗАПУСК ЗАДАЧИ (POST)
+// 1. POST: Только ЗАПУСКАЕТ процесс (это быстро)
 export async function POST(req) {
   try {
     const { personImage, garmentImage } = await req.json();
@@ -16,7 +30,9 @@ export async function POST(req) {
       return NextResponse.json({ error: "Нет фото" }, { status: 400 });
     }
 
-    // Создаем задачу, но не ждем результат (.predictions.create)
+    console.log("🚀 [API] Создаем задачу...");
+
+    // Создаем предсказание, но НЕ ждем результат (используем .create вместо .run)
     const prediction = await replicate.predictions.create({
       version: "0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
       input: {
@@ -32,7 +48,9 @@ export async function POST(req) {
       }
     });
 
-    // Возвращаем клиенту ID задачи
+    console.log("✅ [API] Задача создана, ID:", prediction.id);
+
+    // Возвращаем ID задачи клиенту
     return NextResponse.json(prediction);
 
   } catch (error) {
@@ -41,7 +59,7 @@ export async function POST(req) {
   }
 }
 
-// 2. ПРОВЕРКА СТАТУСА (GET)
+// 2. GET: Проверяет статус задачи по ID
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -53,6 +71,7 @@ export async function GET(req) {
 
     const prediction = await replicate.predictions.get(id);
 
+    // Если всё готово — возвращаем результат
     return NextResponse.json(prediction);
 
   } catch (error) {
