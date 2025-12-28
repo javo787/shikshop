@@ -7,14 +7,9 @@ export async function POST(req) {
   try {
     const { personImage, garmentImage } = await req.json();
 
-    // 🧨 ЯДЕРНЫЙ МЕТОД: Вставляем ключ прямо сюда
-    // Вставь свой токен r8_... ВНУТРЬ кавычек ниже 👇
-    const API_TOKEN = "r8_OnzGJ5V35eYkWbpF4FjYiULQgTDaHdz0c2bCm";
-
-    console.log("🚀 [API] Используем вшитый ключ (Hardcode Check)...");
-
+    // 👇 БЕРЕМ КЛЮЧ ИЗ НАСТРОЕК VERCEL (БЕЗОПАСНО)
     const replicate = new Replicate({
-      auth: API_TOKEN, // Берем переменную сверху
+      auth: process.env.REPLICATE_API_TOKEN,
     });
 
     if (!personImage || !garmentImage) {
@@ -36,11 +31,10 @@ export async function POST(req) {
       }
     });
 
-    console.log("✅ [API] Задача создана, ID:", prediction.id);
     return NextResponse.json(prediction);
 
   } catch (error) {
-    console.error("❌ Ошибка запуска:", error);
+    console.error("❌ Ошибка:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -50,11 +44,9 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
-    // И здесь тоже вставляем ключ
-    const API_TOKEN = "ВСТАВЬ_СЮДА_СВОЙ_ТОКЕН_КОТОРЫЙ_НАЧИНАЕТСЯ_НА_r8"; 
-
+    // 👇 И ЗДЕСЬ ТОЖЕ БЕЗОПАСНО
     const replicate = new Replicate({
-      auth: API_TOKEN,
+      auth: process.env.REPLICATE_API_TOKEN,
     });
 
     if (!id) {
