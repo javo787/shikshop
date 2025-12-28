@@ -3,28 +3,23 @@ import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
-// 1. ЗАПУСК ЗАДАЧИ (POST)
 export async function POST(req) {
   try {
     const { personImage, garmentImage } = await req.json();
 
-    // 👇 ВАЖНО: Инициализируем Replicate ВНУТРИ функции, а не снаружи
-    // Это гарантирует, что ключ считывается в момент запроса
-    const replicate = new Replicate({
-      auth: process.env.REPLICATE_API_TOKEN,
-    });
+    // 🧨 ЯДЕРНЫЙ МЕТОД: Вставляем ключ прямо сюда
+    // Вставь свой токен r8_... ВНУТРЬ кавычек ниже 👇
+    const API_TOKEN = "r8_IHC6UTTHyLFXtyVieNraCiCqxITyOYx3Z0oAW"; 
 
-    // Шпионская проверка (на всякий случай)
-    if (!process.env.REPLICATE_API_TOKEN) {
-        console.error("❌ [CRITICAL] Токен не найден внутри функции!");
-        throw new Error("API Key is missing on Vercel Server");
-    }
+    console.log("🚀 [API] Используем вшитый ключ (Hardcode Check)...");
+
+    const replicate = new Replicate({
+      auth: API_TOKEN, // Берем переменную сверху
+    });
 
     if (!personImage || !garmentImage) {
       return NextResponse.json({ error: "Нет фото" }, { status: 400 });
     }
-
-    console.log("🚀 [API] Создаем задачу...");
 
     const prediction = await replicate.predictions.create({
       version: "0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
@@ -46,20 +41,20 @@ export async function POST(req) {
 
   } catch (error) {
     console.error("❌ Ошибка запуска:", error);
-    // Прокидываем текст ошибки клиенту
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// 2. ПРОВЕРКА СТАТУСА (GET)
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
-    // 👇 Тоже инициализируем внутри
+    // И здесь тоже вставляем ключ
+    const API_TOKEN = "ВСТАВЬ_СЮДА_СВОЙ_ТОКЕН_КОТОРЫЙ_НАЧИНАЕТСЯ_НА_r8"; 
+
     const replicate = new Replicate({
-      auth: process.env.REPLICATE_API_TOKEN,
+      auth: API_TOKEN,
     });
 
     if (!id) {
@@ -67,7 +62,6 @@ export async function GET(req) {
     }
 
     const prediction = await replicate.predictions.get(id);
-
     return NextResponse.json(prediction);
 
   } catch (error) {
