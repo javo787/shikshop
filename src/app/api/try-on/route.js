@@ -3,28 +3,22 @@ import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
-// 👇👇👇 НАЧАЛО ШПИОНСКОЙ ПРОВЕРКИ 👇👇👇
-// Этот блок напишет в логах Vercel, видит ли он твой токен на самом деле.
-const token = process.env.REPLICATE_API_TOKEN;
-console.log("🔍 [DEBUG] Токен загружен?", token ? "ДА" : "НЕТ (NULL/UNDEFINED)");
-
-if (token) {
-    // Показываем первые 3 буквы, чтобы убедиться, что это правильный токен (должен быть "r8_")
-    console.log("🔍 [DEBUG] Первые 3 символа:", token.substring(0, 3));
-    console.log("🔍 [DEBUG] Длина токена:", token.length);
-} else {
-    console.error("❌ [CRITICAL] ТОКЕН ОТСУТСТВУЕТ! Vercel его не видит.");
-}
-// 👆👆👆 КОНЕЦ ПРОВЕРКИ 👆👆👆
-
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-});
-
-// 1. POST: Только ЗАПУСКАЕТ процесс (это быстро)
+// 1. ЗАПУСК ЗАДАЧИ (POST)
 export async function POST(req) {
   try {
     const { personImage, garmentImage } = await req.json();
+
+    // 👇 ВАЖНО: Инициализируем Replicate ВНУТРИ функции, а не снаружи
+    // Это гарантирует, что ключ считывается в момент запроса
+    const replicate = new Replicate({
+      auth: process.env.REPLICATE_API_TOKEN,
+    });
+
+    // Шпионская проверка (на всякий случай)
+    if (!process.env.REPLICATE_API_TOKEN) {
+        console.error("❌ [CRITICAL] Токен не найден внутри функции!");
+        throw new Error("API Key is missing on Vercel Server");
+    }
 
     if (!personImage || !garmentImage) {
       return NextResponse.json({ error: "Нет фото" }, { status: 400 });
@@ -32,7 +26,6 @@ export async function POST(req) {
 
     console.log("🚀 [API] Создаем задачу...");
 
-    // Создаем предсказание, но НЕ ждем результат (используем .create вместо .run)
     const prediction = await replicate.predictions.create({
       version: "0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
       input: {
@@ -49,21 +42,25 @@ export async function POST(req) {
     });
 
     console.log("✅ [API] Задача создана, ID:", prediction.id);
-
-    // Возвращаем ID задачи клиенту
     return NextResponse.json(prediction);
 
   } catch (error) {
     console.error("❌ Ошибка запуска:", error);
+    // Прокидываем текст ошибки клиенту
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// 2. GET: Проверяет статус задачи по ID
+// 2. ПРОВЕРКА СТАТУСА (GET)
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+
+    // 👇 Тоже инициализируем внутри
+    const replicate = new Replicate({
+      auth: process.env.REPLICATE_API_TOKEN,
+    });
 
     if (!id) {
       return NextResponse.json({ error: "No ID provided" }, { status: 400 });
@@ -71,7 +68,6 @@ export async function GET(req) {
 
     const prediction = await replicate.predictions.get(id);
 
-    // Если всё готово — возвращаем результат
     return NextResponse.json(prediction);
 
   } catch (error) {
