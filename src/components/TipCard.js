@@ -8,7 +8,7 @@ export default function TipCard({ title, description, icon, className }) {
       data-aos-duration="500"
     >
       {icon && (
-        <div className="relative w-8 h-8 mr-3 flex-shrink-0">
+        <div className="relative w-8 h-8 mr-3 shrink-0">
           <Image
             src={icon}
             alt={title}

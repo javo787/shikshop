@@ -21,9 +21,18 @@ export default withNextIntl({
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
-        pathname: '/dprydst2c/**', // Твой cloud name
+        pathname: '/dprydst2c/**',
       },
-      // 👇 ВАЖНО: Домены для AI-генерации (Gradio / Hugging Face)
+      // 👇 ВАЖНО: Разрешаем картинки от Replicate
+      {
+        protocol: 'https',
+        hostname: 'replicate.delivery',
+      },
+      {
+        protocol: 'https',
+        hostname: 'replicate.com',
+      },
+      // Другие домены AI
       {
         protocol: 'https',
         hostname: '*.gradio.live',

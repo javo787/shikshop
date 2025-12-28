@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@gradio/client": "^2.0.1",
+    "@huggingface/inference": "^4.13.5",
     "aos": "^2.3.4",
     "cookies-next": "^6.1.0",
     "date-fns": "^4.1.0",
@@ -25,6 +26,7 @@
     "node-fetch": "^3.3.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "replicate": "^1.4.0",
     "retry-fetch": "^1.0.0",
     "stream": "^0.0.3"
   },

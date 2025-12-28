@@ -6,7 +6,6 @@ import Link from 'next/link';
 import ProductCard from '@/components/ProductCard';
 import TryOnModal from '@/components/TryOnModal';
 
-// Простая функция форматирования даты
 const formatDate = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -25,7 +24,6 @@ export default function ProductClient({ product, similarProducts, reviews }) {
   const [isTryOnOpen, setIsTryOnOpen] = useState(false);
   const modalRef = useRef(null);
 
-  // Собираем картинки в массив
   const images = useMemo(() => {
     const list = [];
     if (product?.imageLarge) list.push(product.imageLarge);
@@ -37,10 +35,29 @@ export default function ProductClient({ product, similarProducts, reviews }) {
     return list;
   }, [product]);
 
+  // --- ЛОГИРОВАНИЕ (можно потом удалить) ---
+  useEffect(() => {
+    console.log('%c[ProductClient] State Change:', 'color: blue; font-weight: bold', {
+      isTryOnOpen,
+      currentImageIndex,
+      currentImage: images[currentImageIndex]
+    });
+  }, [isTryOnOpen, currentImageIndex, images]);
+
+  const handleOpenTryOn = () => {
+    console.log('%c[ProductClient] Клик по кнопке "Примерить"', 'color: green; font-weight: bold');
+    setIsTryOnOpen(true);
+  };
+
+  const handleCloseTryOn = () => {
+    console.log('%c[ProductClient] Закрытие окна', 'color: orange; font-weight: bold');
+    setIsTryOnOpen(false);
+  };
+  // -------------------
+
   const handleThumbnailClick = (index) => setCurrentImageIndex(index);
   const handleImageClick = () => setIsFullScreen(true);
   const handleCloseFullScreen = useCallback(() => setIsFullScreen(false), []);
-
 
   const handleKeyDown = useCallback((e) => {
     if (!isFullScreen) return;
@@ -53,7 +70,7 @@ export default function ProductClient({ product, similarProducts, reviews }) {
     if (isFullScreen) {
       document.addEventListener('keydown', handleKeyDown);
       modalRef.current?.focus();
-      document.body.style.overflow = 'hidden'; // Блокируем прокрутку
+      document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'auto';
     }
@@ -95,10 +112,8 @@ export default function ProductClient({ product, similarProducts, reviews }) {
   return (
     <div className="container mx-auto px-4 py-8 relative">
       <div className="grid md:grid-cols-2 gap-8">
-        
-        {/* --- ЛЕВАЯ КОЛОНКА: ГАЛЕРЕЯ --- */}
         <div>
-          {/* Главное изображение */}
+          {/* Главное фото */}
           <div 
             className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-zoom-in z-0" 
             onClick={handleImageClick}
@@ -108,7 +123,7 @@ export default function ProductClient({ product, similarProducts, reviews }) {
               alt={product.name}
               fill
               className="object-contain"
-              priority // Загружать сразу
+              priority
             />
           </div>
 
@@ -119,7 +134,8 @@ export default function ProductClient({ product, similarProducts, reviews }) {
                 <button
                   key={idx}
                   onClick={() => handleThumbnailClick(idx)}
-                  className={`flex-shrink-0 w-20 h-20 rounded border-2 overflow-hidden ${
+                  // 👇 ДОБАВЛЕНО 'relative' В НАЧАЛО
+                  className={`relative flex-shrink-0 w-20 h-20 rounded border-2 overflow-hidden ${
                     idx === currentImageIndex ? 'border-accent-rose' : 'border-gray-300'
                   }`}
                 >
@@ -129,10 +145,9 @@ export default function ProductClient({ product, similarProducts, reviews }) {
             </div>
           )}
 
-          {/* Кнопка примерки */}
           <div className="mt-6 text-center">
             <button
-              onClick={() => setIsTryOnOpen(true)}
+              onClick={handleOpenTryOn}
               className="w-full md:w-auto bg-gradient-to-r from-accent-rose to-primary-pink text-white px-8 py-3 rounded-lg hover:shadow-lg hover:scale-105 transition-all text-lg font-medium flex items-center justify-center gap-2 mx-auto"
             >
               <span>✨</span> Примерить онлайн
@@ -141,24 +156,20 @@ export default function ProductClient({ product, similarProducts, reviews }) {
           </div>
         </div>
 
-        {/* --- ПРАВАЯ КОЛОНКА: ИНФОРМАЦИЯ --- */}
         <div>
           <h1 className="text-3xl font-bold text-text-dark mb-4">{product.name}</h1>
           <p className="text-2xl font-semibold text-accent-rose mb-6">
             {product.price ? `${product.price} TJS` : 'Цена по запросу'}
           </p>
-
           <div className="mb-6">
             <h3 className="font-semibold mb-2">Описание</h3>
             <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
               {product.description}
             </div>
           </div>
-
           {product.material && <p className="mb-2"><strong>Материал:</strong> {product.material}</p>}
           {product.sizes && <p className="mb-2"><strong>Размеры:</strong> {product.sizes}</p>}
-
-          {/* Отзывы */}
+          
           <div className="mt-12 border-t pt-8">
             <h2 className="text-2xl font-bold mb-4">Отзывы</h2>
             <form onSubmit={handleReviewSubmit} className="flex flex-col gap-4 mb-8 bg-gray-50 p-4 rounded-lg dark:bg-gray-800">
@@ -184,7 +195,6 @@ export default function ProductClient({ product, similarProducts, reviews }) {
         </div>
       </div>
 
-      {/* Похожие товары */}
       {similarProducts?.length > 0 && (
         <div className="mt-16 border-t pt-8">
           <h2 className="text-2xl font-bold mb-6 text-center">Вам может понравиться</h2>
@@ -194,7 +204,6 @@ export default function ProductClient({ product, similarProducts, reviews }) {
         </div>
       )}
 
-      {/* Модальное окно (FullScreen) - Скрыто по умолчанию */}
       {isFullScreen && (
         <div 
           className="fixed inset-0 bg-black/95 flex items-center justify-center z-[100] backdrop-blur-sm"
@@ -207,10 +216,9 @@ export default function ProductClient({ product, similarProducts, reviews }) {
         </div>
       )}
 
-      {/* Модальное окно (TryOn) */}
       <TryOnModal 
         isOpen={isTryOnOpen} 
-        onClose={() => setIsTryOnOpen(false)} 
+        onClose={handleCloseTryOn} 
         garmentImage={images[currentImageIndex] || product.image} 
       />
     </div>

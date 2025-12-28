@@ -1,53 +1,64 @@
-import { client } from '@gradio/client';
-import { NextResponse } from 'next/server';
+import Replicate from "replicate";
+import { NextResponse } from "next/server";
 
-export const maxDuration = 60; // Увеличиваем таймаут
-export const dynamic = 'force-dynamic';
+const replicate = new Replicate({
+  auth: process.env.REPLICATE_API_TOKEN,
+});
 
 export async function POST(req) {
   try {
     const { personImage, garmentImage } = await req.json();
 
     if (!personImage || !garmentImage) {
-      return NextResponse.json({ error: 'Необходимо фото человека и одежды' }, { status: 400 });
+      return NextResponse.json({ error: "Нет фото" }, { status: 400 });
     }
 
-    // ВАЖНО: Проверяем, что ссылка на одежду публичная (Cloudinary)
-    // Нейросеть НЕ видит локальные ссылки (localhost или /api/images/...)
-    if (!garmentImage.startsWith('http')) {
-      return NextResponse.json({ 
-        error: 'Для примерки выберите товар с фото из Cloudinary (не локальное).' 
-      }, { status: 400 });
-    }
+    console.log("🚀 START: Отправляем запрос в Replicate...");
 
-    console.log("🚀 Запуск AI (yisol)...");
-    
-    // Используем yisol/IDM-VTON (оригинальный спейс часто стабильнее)
-    const app = await client("yisol/IDM-VTON");
+    // Запускаем модель
+    const output = await replicate.run(
+      "cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
+      {
+        input: {
+          crop: false,
+          seed: 42,
+          steps: 30,
+          category: "upper_body",
+          force_dc: false,
+          garm_img: garmentImage,
+          human_img: personImage,
+          mask_only: false,
+          garment_des: "clothing",
+        },
+      }
+    );
 
-    const result = await app.predict("/tryon", [
-      personImage, 
-      garmentImage, 
-      "High quality, realistic", 
-      true, 
-      true, 
-      30, 
-      42 
-    ]);
+    console.log("📥 RAW Replicate Output:", output); // Посмотрим в консоли, что пришло
 
-    // Обработка разных форматов ответа Gradio
-    let generatedImage = null;
-    if (result.data && result.data[0]) {
-        generatedImage = result.data[0].url || result.data[0];
-    }
+    // 👇 ГЛАВНОЕ ИСПРАВЛЕНИЕ: Превращаем ответ в чистую ссылку
+    let finalUrl = output;
 
-    if (!generatedImage) throw new Error("AI вернул пустой результат");
+    // 1. Если это массив (список ссылок), берем первую
+    if (Array.isArray(output)) {
+      finalUrl = output[0];
+    } 
+    // 2. Превращаем в строку (на всякий случай)
+    finalUrl = String(finalUrl);
 
-    return NextResponse.json({ image: generatedImage });
+    console.log("✅ SENDING URL:", finalUrl);
+
+    return NextResponse.json({ resultImage: finalUrl });
+
   } catch (error) {
-    console.error('Ошибка AI-примерки:', error);
-    return NextResponse.json({ 
-        error: 'Сервер AI перегружен или недоступен. Попробуйте через минуту.' 
-    }, { status: 500 });
+    console.error("❌ Ошибка Replicate:", error);
+    
+    if (error.message?.includes("billing") || error.message?.includes("payment")) {
+       return NextResponse.json({ error: "Пополните баланс Replicate." }, { status: 402 });
+    }
+
+    return NextResponse.json(
+      { error: "Не удалось выполнить примерку." },
+      { status: 500 }
+    );
   }
 }
