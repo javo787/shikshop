@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
-  console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN); // Добавлено для проверки
+  console.log("POST /api/try-on called"); // Добавлено для подтверждения вызова
+  console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN || "undefined"); // Добавлено для проверки (с или undefined)
   try {
     const { personImage, garmentImage } = await req.json();
 
@@ -41,7 +42,8 @@ export async function POST(req) {
 }
 
 export async function GET(req) {
-  console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN); // Добавлено для проверки
+  console.log("GET /api/try-on called"); // Добавлено для подтверждения вызова
+  console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN || "undefined"); // Добавлено для проверки
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
