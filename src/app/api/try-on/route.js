@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
+  console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN); // Добавлено для проверки
   try {
     const { personImage, garmentImage } = await req.json();
 
@@ -40,6 +41,7 @@ export async function POST(req) {
 }
 
 export async function GET(req) {
+  console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN); // Добавлено для проверки
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
