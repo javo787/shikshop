@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
   console.log("POST /api/try-on called"); // Добавлено для подтверждения вызова
+  console.log("Auth header will be: Bearer " + (process.env.REPLICATE_API_TOKEN ? process.env.REPLICATE_API_TOKEN : "MISSING"));
   console.log("REPLICATE_API_TOKEN:", process.env.REPLICATE_API_TOKEN || "undefined"); // Добавлено для проверки (с или undefined)
   try {
     const { personImage, garmentImage } = await req.json();
