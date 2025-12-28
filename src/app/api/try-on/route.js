@@ -9,7 +9,7 @@ export async function POST(req) {
 
     // 🧨 ЯДЕРНЫЙ МЕТОД: Вставляем ключ прямо сюда
     // Вставь свой токен r8_... ВНУТРЬ кавычек ниже 👇
-    const API_TOKEN = "r8_IHC6UTTHyLFXtyVieNraCiCqxITyOYx3Z0oAW"; 
+    const API_TOKEN = "r8_OnzGJ5V35eYkWbpF4FjYiULQgTDaHdz0c2bCm";
 
     console.log("🚀 [API] Используем вшитый ключ (Hardcode Check)...");
 
