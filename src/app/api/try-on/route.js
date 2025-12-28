@@ -1,21 +1,34 @@
 import Replicate from "replicate";
 import { NextResponse } from "next/server";
 
+// ⚙️ НАСТРОЙКИ СЕРВЕРА VERCEL (Важно!)
+// Увеличиваем лимит времени выполнения до 60 секунд (максимум для Hobby тарифа)
+export const maxDuration = 60; 
+// Отключаем кэширование, чтобы каждый запрос был уникальным
+export const dynamic = 'force-dynamic';
+
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
 export async function POST(req) {
   try {
-    const { personImage, garmentImage } = await req.json();
+    // 1. Проверка входящих данных
+    const body = await req.json();
+    const { personImage, garmentImage } = body;
 
     if (!personImage || !garmentImage) {
-      return NextResponse.json({ error: "Нет фото" }, { status: 400 });
+      console.warn("⚠️ [API] Ошибка: Отсутствуют изображения");
+      return NextResponse.json(
+        { error: "Необходимо загрузить оба фото (человек и одежда)" }, 
+        { status: 400 }
+      );
     }
 
-    console.log("🚀 START: Отправляем запрос в Replicate...");
+    console.log("🚀 [API] Старт генерации в Replicate...");
 
-    // Запускаем модель
+    // 2. Запуск нейросети
+    // Используем модель IDM-VTON
     const output = await replicate.run(
       "cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
       {
@@ -33,31 +46,48 @@ export async function POST(req) {
       }
     );
 
-    console.log("📥 RAW Replicate Output:", output); // Посмотрим в консоли, что пришло
+    console.log("📥 [API] Ответ от Replicate получен:", output);
 
-    // 👇 ГЛАВНОЕ ИСПРАВЛЕНИЕ: Превращаем ответ в чистую ссылку
+    // 3. Обработка ответа (Приводим к строке)
     let finalUrl = output;
 
-    // 1. Если это массив (список ссылок), берем первую
+    // Если вернулся массив ссылок, берем первую
     if (Array.isArray(output)) {
       finalUrl = output[0];
-    } 
-    // 2. Превращаем в строку (на всякий случай)
+    }
+    
+    // Гарантируем, что это строка
     finalUrl = String(finalUrl);
 
-    console.log("✅ SENDING URL:", finalUrl);
+    if (!finalUrl || !finalUrl.startsWith('http')) {
+        throw new Error("Replicate не вернул корректную ссылку на изображение");
+    }
+
+    console.log("✅ [API] Успех. Ссылка отправлена клиенту:", finalUrl);
 
     return NextResponse.json({ resultImage: finalUrl });
 
   } catch (error) {
-    console.error("❌ Ошибка Replicate:", error);
-    
+    console.error("❌ [API CRITICAL ERROR]:", error);
+
+    // Специальная обработка ошибок оплаты
     if (error.message?.includes("billing") || error.message?.includes("payment")) {
-       return NextResponse.json({ error: "Пополните баланс Replicate." }, { status: 402 });
+      return NextResponse.json(
+        { error: "На сервере AI закончились средства. Пожалуйста, пополните баланс." }, 
+        { status: 402 }
+      );
+    }
+
+    // Обработка тайм-аута (если вдруг 60 сек не хватило)
+    if (error.name === 'TimeoutError' || error.message?.includes('timed out')) {
+        return NextResponse.json(
+            { error: "Сервер не успел ответить. Попробуйте еще раз через минуту." },
+            { status: 504 }
+        );
     }
 
     return NextResponse.json(
-      { error: "Не удалось выполнить примерку." },
+      { error: "Не удалось выполнить примерку. Попробуйте другое фото." },
       { status: 500 }
     );
   }
