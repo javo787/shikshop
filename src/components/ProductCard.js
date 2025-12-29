@@ -5,18 +5,25 @@ import ClientImage from './ClientImage';
 import Icon from './Icon';
 
 export default function ProductCard({ product, onQuickView }) {
+  console.log("🚀 ProductCard: Компонент монтируется. product=", product ? product._id : "нет", ", onQuickView=", onQuickView ? "есть" : "нет");
+
   if (!product || !product._id) {
+    console.log("❌ ProductCard: Ошибка - продукт не найден или нет _id");
     return <div className="text-red-500 text-center">Ошибка: товар не найден</div>;
   }
 
   // Берем первое подходящее изображение (imageLarge > image > additional[0])
   const displayImage = product.imageLarge || product.image || (product.additionalImages && product.additionalImages[0]) || '/images/placeholder.jpg';
+  console.log('🖼 ProductCard: displayImage выбран =', displayImage);
 
-  console.log('ProductCard: displayImage =', displayImage); // Отладка
+  const handleQuickView = () => {
+    console.log("🔍 ProductCard: Клик на Quick View для product._id=", product._id);
+    onQuickView();
+  };
 
   return (
     <div className="border rounded-lg overflow-hidden shadow-md">
-      <Link href={`/product/${product._id}`}>
+      <Link href={`/product/${product._id}`} onClick={() => console.log("🔗 ProductCard: Клик на ссылку продукта, _id=", product._id)}>
         <div className="relative w-full h-64">
           <ClientImage
             src={displayImage}
@@ -33,7 +40,7 @@ export default function ProductCard({ product, onQuickView }) {
         <p className="text-text-gray mb-2">{product.price ? `${product.price} TJS` : 'Цена не указана'}</p>
         <div className="flex justify-center gap-2">
           <button
-            onClick={onQuickView}
+            onClick={handleQuickView}
             className="flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm sm:text-base hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
             aria-label={`Быстрый просмотр: ${product.name || 'Товар'}`}
           >

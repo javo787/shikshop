@@ -18,6 +18,8 @@ const COMPLIMENTS = [
 ];
 
 export default function TryOnModal({ isOpen, onClose, garmentImage }) {
+  console.log("🚀 TryOnModal: Компонент монтируется. isOpen=", isOpen, ", garmentImage=", garmentImage ? "есть" : "нет");
+
   const [personImage, setPersonImage] = useState(null);
   const [generatedImage, setGeneratedImage] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -29,7 +31,9 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
+    console.log("🔄 useEffect: isOpen изменился на", isOpen);
     if (!isOpen) {
+      console.log("🧹 Очистка состояний (через 300ms)...");
       setTimeout(() => {
         setPersonImage(null);
         setGeneratedImage(null);
@@ -37,17 +41,20 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
         setError(null);
         setLoading(false);
         setIsDragging(false);
+        console.log("✅ Состояния очищены");
       }, 300);
     }
   }, [isOpen]);
 
   // Наложение логотипа
   const applyBranding = async (imageUrl) => {
+    console.log("🖼 applyBranding: Запуск для imageUrl=", imageUrl);
     return new Promise((resolve) => {
       const img = new window.Image();
       img.crossOrigin = "Anonymous";
       img.src = imageUrl;
       img.onload = () => {
+        console.log("🖼 applyBranding: Основное изображение загружено");
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = img.width;
@@ -57,54 +64,87 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
         const logo = new window.Image();
         logo.src = LOGO_PATH;
         logo.onload = () => {
+          console.log("🖼 applyBranding: Логотип загружен");
           const logoWidth = canvas.width * 0.20; 
           const logoHeight = logo.height * (logoWidth / logo.width);
           const padding = canvas.width * 0.05;
           ctx.globalAlpha = 0.9;
           ctx.drawImage(logo, canvas.width - logoWidth - padding, padding, logoWidth, logoHeight);
-          resolve(canvas.toDataURL('image/png'));
+          const brandedUrl = canvas.toDataURL('image/png');
+          console.log("✅ applyBranding: Брендированное изображение создано");
+          resolve(brandedUrl);
         };
-        logo.onerror = () => resolve(imageUrl);
+        logo.onerror = () => {
+          console.error("❌ applyBranding: Ошибка загрузки логотипа");
+          resolve(imageUrl);
+        };
       };
-      img.onerror = () => resolve(imageUrl);
+      img.onerror = () => {
+        console.error("❌ applyBranding: Ошибка загрузки основного изображения");
+        resolve(imageUrl);
+      };
     });
   };
 
   const processFile = (file) => {
+    console.log("📥 processFile: Обработка файла. file=", file ? file.name : "нет");
     setError(null);
     if (!file) return;
     if (!ALLOWED_TYPES.includes(file.type)) {
+      console.log("❌ processFile: Неподдерживаемый тип", file.type);
       setError('Поддерживаются только форматы JPG, PNG и WEBP.');
       return;
     }
     if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      console.log("❌ processFile: Файл слишком большой", file.size);
       setError(`Файл слишком большой. Максимум ${MAX_FILE_SIZE_MB} МБ.`);
       return;
     }
     const reader = new FileReader();
-    reader.onloadend = () => setPersonImage(reader.result);
+    reader.onloadend = () => {
+      console.log("✅ processFile: Файл прочитан успешно");
+      setPersonImage(reader.result);
+    };
     reader.readAsDataURL(file);
   };
 
-  const handleFileChange = (e) => processFile(e.target.files[0]);
-  const onDragOver = useCallback((e) => { e.preventDefault(); setIsDragging(true); }, []);
-  const onDragLeave = useCallback((e) => { e.preventDefault(); setIsDragging(false); }, []);
+  const handleFileChange = (e) => {
+    console.log("📂 handleFileChange: Выбор файла");
+    processFile(e.target.files[0]);
+  };
+  const onDragOver = useCallback((e) => { 
+    e.preventDefault(); 
+    setIsDragging(true); 
+    console.log("🖱 onDragOver: Drag over активирован"); 
+  }, []);
+  const onDragLeave = useCallback((e) => { 
+    e.preventDefault(); 
+    setIsDragging(false); 
+    console.log("🖱 onDragLeave: Drag leave"); 
+  }, []);
   const onDrop = useCallback((e) => {
-    e.preventDefault(); setIsDragging(false);
+    e.preventDefault(); 
+    setIsDragging(false);
+    console.log("🖱 onDrop: Файл dropped");
     if (e.dataTransfer.files && e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
   }, []);
 
   // 🔥 ОБНОВЛЕННАЯ ЛОГИКА (POLLING)
   const handleTryOn = async () => {
-    if (!personImage || !garmentImage) return;
+    console.log("🚀 handleTryOn: Запуск. personImage=", personImage ? "есть" : "нет", ", garmentImage=", garmentImage ? "есть" : "нет");
+    if (!personImage || !garmentImage) {
+      console.log("❌ handleTryOn: Нет изображений - выход");
+      return;
+    }
 
     setLoading(true);
     setError(null);
     setStep('processing');
+    console.log("🔄 handleTryOn: Установлен step=processing, loading=true");
 
     try {
       // 1. ЗАПУСК
-      console.log("🚀 Запуск задачи...");
+      console.log("🚀 handleTryOn: Запуск задачи (POST /api/try-on)...");
       const startResponse = await fetch('/api/try-on', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,121 +157,151 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
       }
 
       let prediction = await startResponse.json();
-      console.log("✅ Задача создана. ID:", prediction.id);
+      console.log("✅ handleTryOn: Задача создана. ID=", prediction.id, ", status=", prediction.status);
 
       // 2. ЦИКЛ ПРОВЕРКИ
       while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
-        // Ждем 3 секунды
+        console.log("🔄 handleTryOn: Ждем 3 секунды перед проверкой...");
         await new Promise((resolve) => setTimeout(resolve, 3000));
 
-        // Спрашиваем статус
+        console.log("🔄 handleTryOn: Проверка статуса (GET /api/try-on?id=)...");
         const checkResponse = await fetch(`/api/try-on?id=${prediction.id}`);
         
         if (checkResponse.ok) {
            prediction = await checkResponse.json();
-           console.log("🔄 Статус:", prediction.status);
+           console.log("🔄 handleTryOn: Новый статус=", prediction.status);
+        } else {
+          console.error("❌ handleTryOn: Ошибка проверки статуса");
         }
       }
 
       // 3. РЕЗУЛЬТАТ
       if (prediction.status === 'failed') {
+        console.log("❌ handleTryOn: Задача failed");
         throw new Error("Нейросеть не справилась с фото. Попробуйте другое.");
       }
 
       let finalUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-      
+      console.log("✅ handleTryOn: Результат получен. finalUrl=", finalUrl);
+
+      console.log("🖼 handleTryOn: Применяем брендинг...");
       const brandedImage = await applyBranding(finalUrl);
+      console.log("✅ handleTryOn: Брендинг применен. brandedImage=", brandedImage ? "есть" : "нет");
 
       setCompliment(COMPLIMENTS[Math.floor(Math.random() * COMPLIMENTS.length)]);
       setGeneratedImage(brandedImage);
       setStep('result');
+      console.log("🔄 handleTryOn: Установлен step=result");
 
     } catch (err) {
-      console.error(err);
+      console.error("❌ handleTryOn: Ошибка:", err.message);
       setError(err.message || 'Произошла ошибка. Попробуйте другое фото.');
       setStep('upload');
+      console.log("🔄 handleTryOn: Установлен step=upload из-за ошибки");
     } finally {
       setLoading(false);
+      console.log("🏁 handleTryOn: Завершено, loading=false");
     }
   };
 
   const handleDownload = async () => {
-    if (!generatedImage) return;
+    console.log("📥 handleDownload: Запуск. generatedImage=", generatedImage ? "есть" : "нет");
+    if (!generatedImage) {
+      console.log("❌ handleDownload: Нет изображения - выход");
+      return;
+    }
     const link = document.createElement('a');
     link.href = generatedImage;
     link.download = `parizod-premium-${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    console.log("✅ handleDownload: Изображение скачано");
   };
 
   const reset = () => {
+    console.log("🔄 reset: Сброс состояний...");
     setGeneratedImage(null);
     setStep('upload');
     setError(null);
     setPersonImage(null);
+    console.log("✅ reset: Сброшено");
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log("🚫 TryOnModal: isOpen=false - не рендерим");
+    return null;
+  }
+
+  console.log("🖥 TryOnModal: Рендер. step=", step, ", loading=", loading, ", error=", error);
 
   // --- RENDER (Дизайн остался прежним) ---
-  const renderProcessing = () => (
-    <div className="flex flex-col items-center justify-center h-[400px] text-center animate-fadeIn">
-      <div className="relative w-24 h-24 mb-8">
-        <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
-        <div className="absolute inset-0 border-4 border-pink-500 rounded-full border-t-transparent animate-spin"></div>
-        <div className="absolute inset-0 flex items-center justify-center text-2xl animate-pulse">✨</div>
+  const renderProcessing = () => {
+    console.log("🖥 renderProcessing: Рендер processing");
+    return (
+      <div className="flex flex-col items-center justify-center h-[400px] text-center animate-fadeIn">
+        <div className="relative w-24 h-24 mb-8">
+          <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-pink-500 rounded-full border-t-transparent animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center text-2xl animate-pulse">✨</div>
+        </div>
+        <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-3">Создаем магию...</h4>
+        <p className="text-gray-500 max-w-xs mx-auto">Примерка займет около 30 секунд. Пожалуйста, не закрывайте окно.</p>
       </div>
-      <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-3">Создаем магию...</h4>
-      <p className="text-gray-500 max-w-xs mx-auto">Примерка займет около 30 секунд. Пожалуйста, не закрывайте окно.</p>
-    </div>
-  );
+    );
+  };
 
-  const renderResult = () => (
-    <div className="flex flex-col items-center animate-slideUp">
-      <div className="text-center mb-6">
-        <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600 mb-2 drop-shadow-sm">{compliment}</h2>
-        <p className="text-gray-500 text-sm">Готово! Образ сохранен в высоком качестве.</p>
-      </div>
-      <div className="relative w-full max-w-md aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl mb-8 group ring-4 ring-pink-50 dark:ring-gray-800 bg-gray-100">
-        <img src={generatedImage} alt="Результат" className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105"/>
-      </div>
-      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-        <button onClick={handleDownload} className="flex-1 px-8 py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl font-bold shadow-lg shadow-pink-500/30 hover:shadow-pink-500/50 hover:-translate-y-1 transition-all flex items-center justify-center gap-2 group active:scale-95">
-          <svg className="w-6 h-6 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Скачать фото
-        </button>
-        <button onClick={reset} className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 text-gray-700 dark:text-white rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 active:scale-95">Ещё раз</button>
-      </div>
-    </div>
-  );
-
-  const renderUpload = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 h-full">
-      <div className="flex flex-col gap-4 group">
-        <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">1</span> Ваше фото</p>
-        <div className={`flex-1 rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer flex flex-col items-center justify-center p-4 min-h-[300px] relative overflow-hidden ${isDragging ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20 scale-[1.02]' : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-pink-400 hover:bg-white'}`} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onClick={() => !personImage && fileInputRef.current?.click()}>
-          {personImage ? (
-            <>
-              <Image src={personImage} alt="Вы" fill className="object-cover rounded-xl" unoptimized />
-              <button onClick={(e) => { e.stopPropagation(); setPersonImage(null); }} className="absolute top-3 right-3 bg-white/90 backdrop-blur rounded-full p-2.5 shadow-lg text-red-500 hover:bg-red-50 hover:scale-110 transition-all z-10"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"></path></svg></button>
-            </>
-          ) : (
-            <div className="text-center p-6 transition-transform group-hover:scale-105 pointer-events-none">
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl transition-colors ${isDragging ? 'bg-pink-200 text-pink-600' : 'bg-pink-100 text-pink-500'}`}>{isDragging ? '📂' : '📸'}</div>
-              <span className="font-bold text-lg text-gray-700 dark:text-gray-200 block mb-1">{isDragging ? 'Отпускайте!' : 'Загрузить фото'}</span>
-            </div>
-          )}
-          <input type="file" ref={fileInputRef} onChange={handleFileChange} accept={ALLOWED_TYPES.join(',')} className="hidden" />
+  const renderResult = () => {
+    console.log("🖥 renderResult: Рендер result");
+    return (
+      <div className="flex flex-col items-center animate-slideUp">
+        <div className="text-center mb-6">
+          <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600 mb-2 drop-shadow-sm">{compliment}</h2>
+          <p className="text-gray-500 text-sm">Готово! Образ сохранен в высоком качестве.</p>
+        </div>
+        <div className="relative w-full max-w-md aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl mb-8 group ring-4 ring-pink-50 dark:ring-gray-800 bg-gray-100">
+          <img src={generatedImage} alt="Результат" className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105"/>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+          <button onClick={handleDownload} className="flex-1 px-8 py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl font-bold shadow-lg shadow-pink-500/30 hover:shadow-pink-500/50 hover:-translate-y-1 transition-all flex items-center justify-center gap-2 group active:scale-95">
+            <svg className="w-6 h-6 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Скачать фото
+          </button>
+          <button onClick={reset} className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 text-gray-700 dark:text-white rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 active:scale-95">Ещё раз</button>
         </div>
       </div>
-      <div className="flex flex-col gap-4">
-        <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">2</span> Одежда</p>
-        <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center justify-center p-4 min-h-[300px] relative shadow-inner">
-          {garmentImage ? (<ClientImage src={garmentImage} alt="Одежда" fill className="object-contain p-4 transition-transform hover:scale-110 duration-500" />) : (<div className="flex flex-col items-center text-gray-400"><p>Нет фото</p></div>)}
+    );
+  };
+
+  const renderUpload = () => {
+    console.log("🖥 renderUpload: Рендер upload");
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 h-full">
+        <div className="flex flex-col gap-4 group">
+          <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">1</span> Ваше фото</p>
+          <div className={`flex-1 rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer flex flex-col items-center justify-center p-4 min-h-[300px] relative overflow-hidden ${isDragging ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20 scale-[1.02]' : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-pink-400 hover:bg-white'}`} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onClick={() => !personImage && fileInputRef.current?.click()}>
+            {personImage ? (
+              <>
+                <Image src={personImage} alt="Вы" fill className="object-cover rounded-xl" unoptimized />
+                <button onClick={(e) => { e.stopPropagation(); setPersonImage(null); }} className="absolute top-3 right-3 bg-white/90 backdrop-blur rounded-full p-2.5 shadow-lg text-red-500 hover:bg-red-50 hover:scale-110 transition-all z-10"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"></path></svg></button>
+              </>
+            ) : (
+              <div className="text-center p-6 transition-transform group-hover:scale-105 pointer-events-none">
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl transition-colors ${isDragging ? 'bg-pink-200 text-pink-600' : 'bg-pink-100 text-pink-500'}`}>{isDragging ? '📂' : '📸'}</div>
+                <span className="font-bold text-lg text-gray-700 dark:text-gray-200 block mb-1">{isDragging ? 'Отпускайте!' : 'Загрузить фото'}</span>
+              </div>
+            )}
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept={ALLOWED_TYPES.join(',')} className="hidden" />
+          </div>
+        </div>
+        <div className="flex flex-col gap-4">
+          <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">2</span> Одежда</p>
+          <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center justify-center p-4 min-h-[300px] relative shadow-inner">
+            {garmentImage ? (<ClientImage src={garmentImage} alt="Одежда" fill className="object-contain p-4 transition-transform hover:scale-110 duration-500" />) : (<div className="flex flex-col items-center text-gray-400"><p>Нет фото</p></div>)}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn duration-300">
