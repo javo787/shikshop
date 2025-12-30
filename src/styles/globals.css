@@ -1,22 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-light: #faf7f5;
+  /* --- ЦВЕТОВАЯ ПАЛИТРА (Обновленная Premium) --- */
+  --color-bg-light: #faf9f6; /* Alabaster - теплее и дороже, чем чисто белый */
   --color-primary-pink: #ffb6c1;
   --color-secondary-lavender: #e6e6fa;
   --color-button-coral: #ff7f50;
   --color-accent-rose: #f08080;
-  --color-soft-rose: #fff1f3;
-  --color-promo-accent: #f7cbca; /* Новый цвет для кнопки акций */
-  --color-text-dark: #4a4a4a;
+  --color-soft-rose: #fff0f5;
+  --color-promo-accent: #f4c2c2;
+  --color-text-dark: #2d2d2d; /* Мягкий черный для лучшей читаемости */
   --color-secondary-peach: #ffe5b4;
   --color-accent-mint: #b2f2bb;
-  --color-dark-teal: #008080;
-  --color-card-cream: #fff5ee;
-  --color-neutral-gray: #d0d7d8;
+  --color-dark-teal: #1a3c40; /* Глубокий, богатый тил */
+  --color-card-cream: #fffaf0;
+  --color-neutral-gray: #e5e7eb;
   --color-accent-emerald: #3d5a80;
   --color-text-light: #f9f9f9;
-  --font-sans: "Inter", sans-serif;
+
+  /* --- ШРИФТЫ --- */
+  /* Используем переменные, которые мы подключили в layout.js */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui;
+  --font-serif: var(--font-playfair), ui-serif, Georgia;
 }
 
 @layer base {
@@ -27,21 +32,56 @@
   ::file-selector-button {
     border-color: var(--color-neutral-gray, currentColor);
   }
+
+  /* Применяем красивый шрифт для всех заголовков */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif);
+    @apply tracking-wide;
+  }
 }
 
 body {
-  @apply bg-bg-light font-sans text-text-dark dark:bg-dark-teal dark:text-text-light;
+  @apply bg-bg-light font-sans text-text-dark dark:bg-dark-teal dark:text-text-light antialiased;
 }
 
+/* --- КОМПОНЕНТЫ (Обновленные) --- */
+
+/* Улучшенная кнопка (Premium стиль) */
 .btn {
-  @apply bg-accent-rose text-text-light px-6 py-3 rounded-lg shadow-sm border border-neutral-gray hover:bg-primary-pink hover:text-text-dark hover:shadow-md hover:scale-105 active:bg-secondary-lavender active:text-text-dark transition-all duration-200 dark:bg-primary-pink dark:hover:bg-accent-rose dark:text-text-light;
+  @apply inline-flex items-center justify-center px-6 py-3 rounded-xl font-medium transition-all duration-300 transform
+         bg-gradient-to-r from-accent-rose to-primary-pink text-white
+         shadow-lg shadow-pink-500/30 border-none
+         hover:shadow-pink-500/50 hover:-translate-y-1 hover:scale-105
+         active:scale-95 active:shadow-inner
+         dark:from-primary-pink dark:to-accent-rose;
 }
 
+/* Старый градиент (оставляем для совместимости) */
 .gradient-banner {
-  @apply bg-linear-to-r from-primary-pink to-secondary-lavender;
+  @apply bg-gradient-to-r from-primary-pink to-secondary-lavender;
 }
 
-/* Анимация для карточек */
+/* --- НОВЫЕ ЭФФЕКТЫ --- */
+
+/* Стеклянный эффект (Glassmorphism) */
+.glass {
+  @apply bg-white/70 dark:bg-dark-teal/70 backdrop-blur-md border border-white/20 shadow-xl;
+}
+
+/* Премиум карточка товара */
+.card-premium {
+  @apply bg-white dark:bg-white/5 rounded-2xl overflow-hidden transition-all duration-500
+         border border-transparent hover:border-pink-200 dark:hover:border-pink-900/30
+         hover:shadow-2xl hover:shadow-pink-500/10 hover:-translate-y-2;
+}
+
+/* Градиентный текст */
+.text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-accent-rose to-purple-500;
+}
+
+/* --- АНИМАЦИИ (Из старого файла + улучшения) --- */
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -54,10 +94,9 @@ body {
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.5s ease-out forwards;
+  animation: fadeIn 0.6s ease-out forwards;
 }
 
-/* Анимация для смены изображений */
 .fade-image {
   transition: opacity 0.3s ease-in-out;
 }
@@ -69,6 +108,8 @@ body {
 .fade-image.loaded {
   opacity: 1;
 }
+
+/* --- ТЕХНИЧЕСКИЕ СТИЛИ (Из старого файла) --- */
 
 /* Стили для миниатюр на маленьких экранах */
 .thumbnail-container {
@@ -98,5 +139,3 @@ body {
     justify-content: center;
   }
 }
-
-

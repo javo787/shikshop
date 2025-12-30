@@ -1,15 +1,24 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { cookies } from 'next/headers';
 import Script from 'next/script';
-import { Inter } from 'next/font/google';
+import { Inter, Playfair_Display } from 'next/font/google'; // 1. Импорт Playfair_Display
 import Header from '@/components/Header';
 import AOSInitializer from '@/components/AOSInitializer';
-import GoogleAnalytics from '@/components/GoogleAnalytics'; // Импорт компонента
+import GoogleAnalytics from '@/components/GoogleAnalytics';
 import '@/styles/globals.css';
 
+// Основной шрифт (для текста)
 const inter = Inter({
   subsets: ['latin', 'cyrillic'],
   weight: ['400', '500', '600', '700'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+// Акцентный шрифт (для заголовков)
+const playfair = Playfair_Display({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-playfair', // 2. Создаем CSS переменную
   display: 'swap',
 });
 
@@ -26,11 +35,12 @@ export default async function RootLayout({ children }) {
   }
 
   return (
-    <html lang={locale} className={`${inter.className} dark`}>
+    // 3. Добавляем оба шрифта в className
+    <html lang={locale} className={`${inter.variable} ${playfair.variable} dark`}>
       <head>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" />
       </head>
-      <body className="bg-bg-light dark:bg-dark-teal">
+      <body className="bg-bg-light dark:bg-dark-teal font-sans">
         <GoogleAnalytics GA_MEASUREMENT_ID="G-QGF9MP9P5S" />
 
         <NextIntlClientProvider locale={locale} messages={messages}>
