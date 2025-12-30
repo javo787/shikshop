@@ -115,7 +115,7 @@ export default function Header({ locale }) {
               
               {/* Скрываем Login, если мы уже там */}
               {pathname !== `/${selectedLocale}/login` && pathname !== '/login' && (
-                <Link href="/login" className="hover:text-primary-pink transition-transform hover:-translate-y-0.5">
+                <Link href="/profile" className="hover:text-primary-pink transition-transform hover:-translate-y-0.5">
                   <Icon name="login" className="w-6 h-6" />
                 </Link>
               )}
