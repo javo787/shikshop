@@ -3,12 +3,12 @@ import { cookies } from 'next/headers';
 import Script from 'next/script';
 import { Inter, Playfair_Display } from 'next/font/google';
 import Header from '@/components/Header';
-import Footer from '@/components/Footer'; // <--- Импорт нового компонента Footer
+import Footer from '@/components/Footer';
+import NewUserPrompt from '@/components/NewUserPrompt'; // <--- 1. Импорт
 import AOSInitializer from '@/components/AOSInitializer';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
 import '@/styles/globals.css';
 
-// Основной шрифт (для текста)
 const inter = Inter({
   subsets: ['latin', 'cyrillic'],
   weight: ['400', '500', '600', '700'],
@@ -16,7 +16,6 @@ const inter = Inter({
   display: 'swap',
 });
 
-// Акцентный шрифт (для заголовков)
 const playfair = Playfair_Display({
   subsets: ['latin', 'cyrillic'],
   variable: '--font-playfair',
@@ -29,7 +28,6 @@ export default async function RootLayout({ children }) {
   
   let messages;
   try {
-    // Импорт сообщений (путь относительный к src/app)
     messages = (await import(`../../messages/${locale}.json`)).default;
   } catch (error) {
     console.error('RootLayout: error loading messages for locale', locale, error);
@@ -41,18 +39,18 @@ export default async function RootLayout({ children }) {
       <head>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" />
       </head>
-      {/* Добавили flex flex-col min-h-screen, чтобы футер прижимался к низу */}
       <body className="bg-bg-light dark:bg-dark-teal font-sans flex flex-col min-h-screen">
         <GoogleAnalytics GA_MEASUREMENT_ID="G-QGF9MP9P5S" />
 
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Header locale={locale} />
           
-          {/* flex-grow заставляет контент занимать все свободное место */}
           <main className="flex-grow">{children}</main>
           
-          {/* Вставляем глобальный футер */}
           <Footer />
+          
+          {/* 2. Вставляем всплывающее окно (оно fixed, поэтому место вставки не критично, но лучше в конце) */}
+          <NewUserPrompt />
           
           <AOSInitializer />
         </NextIntlClientProvider>
