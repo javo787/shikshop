@@ -272,51 +272,6 @@ export default async function Home() {
           </Link>
         </p>
       </section>
-
-      <footer className="bg-dark-teal text-text-light py-12 dark:bg-accent-emerald dark:text-text-dark" data-aos="fade-up">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-3 gap-8">
-          <div className="order-first sm:order-none">
-            <h3 className="text-xl font-semibold mb-4">{t('footerSubscribeTitle')}</h3>
-            <form className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="email"
-                placeholder={t('footerSubscribePlaceholder')}
-                className="p-2 rounded bg-text-light text-dark-teal border border-neutral-gray dark:bg-card-cream dark:text-dark-teal"
-              />
-              <button className="bg-accent-rose text-text-light px-4 py-2 rounded hover:bg-primary-pink dark:bg-primary-pink dark:hover:bg-accent-rose">
-                {t('footerSubscribeButton')}
-              </button>
-            </form>
-          </div>
-          <div>
-            <h3 className="text-xl font-semibold mb-4">{t('footerContactTitle')}</h3>
-            <p>{t('footerAddress')}</p>
-            <p>{t('footerPhone')}</p>
-            <p>{t('footerEmail')}</p>
-            <div className="flex space-x-4 mt-4">
-              <a href="https://www.instagram.com/parizod_tj/" target="_blank" className="hover:text-primary-pink dark:hover:text-secondary-peach">
-                <Icon name="instagram" className="w-6 h-6" />
-              </a>
-              <a href="https://whatsapp.com/channel/0029VbAeSyaAzNbnGuVFzZ1r" target="_blank" className="hover:text-primary-pink dark:hover:text-secondary-peach">
-                <Icon name="whatsapp" className="w-6 h-6" />
-              </a>
-            </div>
-          </div>
-          <div>
-            <h3 className="text-xl font-semibold mb-4">{t('footerLinksTitle')}</h3>
-            <ul className="space-y-2">
-              <li><Link href="/" className="hover:underline">{t('headerhome')}</Link></li>
-              <li><Link href="/catalog" className="hover:underline">{t('headercatalog')}</Link></li>
-              <li><Link href="/lookbook" className="hover:underline">{t('headerlookbook')}</Link></li>
-              <li><Link href="/about" className="hover:underline">{t('headerabout')}</Link></li>
-              <li><Link href="/contacts" className="hover:underline">{t('headercontacts')}</Link></li>
-            </ul>
-          </div>
-        </div>
-        <div className="mt-8 text-center text-neutral-gray dark:text-text-light">
-          <p>{t('footerCopyright')}</p>
-        </div>
-      </footer>
     </div>
   );
 }
