@@ -4,9 +4,10 @@ import Script from 'next/script';
 import { Inter, Playfair_Display } from 'next/font/google';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import NewUserPrompt from '@/components/NewUserPrompt'; // <--- 1. Импорт
+import NewUserPrompt from '@/components/NewUserPrompt';
 import AOSInitializer from '@/components/AOSInitializer';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
+import { FavoritesProvider } from '@/context/FavoritesContext'; // <--- 1. Импорт Context
 import '@/styles/globals.css';
 
 const inter = Inter({
@@ -43,16 +44,17 @@ export default async function RootLayout({ children }) {
         <GoogleAnalytics GA_MEASUREMENT_ID="G-QGF9MP9P5S" />
 
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <Header locale={locale} />
-          
-          <main className="flex-grow">{children}</main>
-          
-          <Footer />
-          
-          {/* 2. Вставляем всплывающее окно (оно fixed, поэтому место вставки не критично, но лучше в конце) */}
-          <NewUserPrompt />
-          
-          <AOSInitializer />
+          <FavoritesProvider> {/* <--- 2. Оборачиваем весь сайт */}
+            <Header locale={locale} />
+            
+            <main className="flex-grow">{children}</main>
+            
+            <Footer />
+            
+            <NewUserPrompt />
+            
+            <AOSInitializer />
+          </FavoritesProvider>
         </NextIntlClientProvider>
         
         <Script
