@@ -5,6 +5,7 @@ import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getCookie } from 'cookies-next'; // <--- 1. Добавлен импорт
 import Icon from '@/components/Icon';
 import ClientImage from '@/components/ClientImage';
 
@@ -14,6 +15,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'orders', 'favorites'
   const router = useRouter();
+
+  // <--- 2. Читаем имя из куки для мгновенного отображения
+  const cookieName = getCookie('parizod_name');
 
   // Состояния формы
   const [formData, setFormData] = useState({ name: '', phone: '', address: '' });
@@ -66,6 +70,8 @@ export default function ProfilePage() {
 
       if (res.ok) {
         setMessage('Данные успешно сохранены!');
+        // Обновляем локальное состояние, чтобы имя сразу поменялось
+        setDbUser(prev => ({ ...prev, ...formData }));
         setTimeout(() => setMessage(''), 3000);
       } else {
         setMessage('Ошибка при сохранении.');
@@ -93,11 +99,13 @@ export default function ProfilePage() {
         <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-primary-pink to-accent-rose flex items-center justify-center text-3xl font-serif text-white shadow-lg">
-              {user?.email?.[0].toUpperCase()}
+              {/* Показываем первую букву имени или email */}
+              {(dbUser?.name || cookieName || user?.email || '?')[0].toUpperCase()}
             </div>
             <div>
+              {/* <--- 3. Обновленная логика отображения имени */}
               <h1 className="text-3xl font-serif font-bold text-dark-teal dark:text-white">
-                {dbUser?.name || 'Пользователь'}
+                {dbUser?.name || cookieName || user?.displayName || 'Пользователь'}
               </h1>
               <p className="text-gray-500 text-sm">{user?.email}</p>
             </div>
