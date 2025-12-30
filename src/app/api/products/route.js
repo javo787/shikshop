@@ -5,44 +5,31 @@ import Product from '@/models/Product';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
-  console.log("🚀 GET /api/products: Запуск метода GET");
-
   try {
-    console.log("🔌 Подключение к MongoDB...");
     await connectMongoDB();
-    console.log("🔌 Подключение к MongoDB успешно");
 
-    console.log("📥 Чтение параметров из URL...");
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const type = searchParams.get('type');
-    console.log("📥 Фильтры: category=", category || "не указан", ", type=", type || "не указан");
 
     const filter = {};
     if (category && category !== 'undefined') filter.category = category;
     if (type && type !== 'undefined') filter.type = type;
-    console.log("🔍 Фильтр для поиска:", filter);
 
-    console.log("🛠 Поиск продуктов...");
     const products = await Product.find(filter).sort({ createdAt: -1 });
-    console.log("🛠 Найдено продуктов:", products.length);
 
-    // 👇 МОЩНАЯ ФУНКЦИЯ ОЧИСТКИ (логируем её вызов)
-    console.log("🧹 Очистка изображений для всех продуктов...");
+    // 👇 Функция очистки изображений
     const fixImage = (img) => {
       if (!img) return null;
       let clean = img.toString().trim();
 
       if (clean.includes('/api/images/http')) {
         clean = clean.replace('/api/images/', '');
-        console.log("🧹 Очистка: Убрали /api/images/ из", img);
       }
 
       if (clean.startsWith('http') || clean.startsWith('/')) {
-        console.log("🧹 Очистка: Уже чистый путь", clean);
         return clean;
       }
-      console.log("🧹 Очистка: Добавили префикс к", clean);
       return `/api/images/${clean}`;
     };
 
@@ -56,7 +43,6 @@ export async function GET(request) {
         additionalImages: p.additionalImages?.map(fixImage) || []
       };
     });
-    console.log("✅ Все продукты очищены и готовы: количество=", enhancedProducts.length);
 
     return NextResponse.json(enhancedProducts);
   } catch (error) {
@@ -66,20 +52,12 @@ export async function GET(request) {
 }
 
 export async function POST(req) {
-  console.log("🚀 POST /api/products: Запуск метода POST");
-
   try {
-    console.log("🔌 Подключение к MongoDB...");
     await connectMongoDB();
-    console.log("🔌 Подключение к MongoDB успешно");
 
-    console.log("📥 Чтение данных из запроса...");
     const productData = await req.json();
-    console.log("📥 Данные получены:", productData ? "есть" : "нет");
 
-    console.log("🛠 Создание нового продукта...");
     const newProduct = await Product.create(productData);
-    console.log("✅ Новый продукт создан: _id=", newProduct._id);
 
     return NextResponse.json(newProduct, { status: 201 });
   } catch (error) {
