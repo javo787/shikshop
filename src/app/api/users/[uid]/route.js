@@ -6,7 +6,7 @@ import Product from '@/models/Product'; // Нужно для подгрузки 
 // GET: Получить данные пользователя
 export async function GET(request, { params }) {
   try {
-    const { uid } = await params; // firebaseUid
+    const { uid } = await params; // Добавили await обратно
     await connectMongoDB();
 
     // Ищем пользователя
@@ -30,10 +30,10 @@ export async function GET(request, { params }) {
   }
 }
 
-// PUT: Обновить данные пользователя
+// PUT: Обновить данные пользователя (или создать, если не существует)
 export async function PUT(request, { params }) {
   try {
-    const { uid } = await params; // В Next.js 15 params нужно ждать
+    const { uid } = await params;
     const body = await request.json();
     
     await connectMongoDB();
@@ -42,18 +42,20 @@ export async function PUT(request, { params }) {
       { firebaseUid: uid },
       { 
         $set: {
+          firebaseUid: uid, // Добавляем для создания
+          email: body.email, // Required поле
           name: body.name,
           phone: body.phone,
           address: body.address,
-          image: body.image, // <--- Добавляем обновление фото
+          image: body.image,
         }
       },
-      { new: true }
+      { new: true, upsert: true } // Создаёт, если не найден
     );
 
     return NextResponse.json(updatedUser, { status: 200 });
   } catch (error) {
-    console.error('Ошибка обновления профиля:', error);
+    console.error('Ошибка обновления/создания профиля:', error);
     return NextResponse.json({ error: 'Ошибка обновления' }, { status: 500 });
   }
 }
