@@ -16,6 +16,7 @@ export default function ProfileSidebar({ user, activeTab, setActiveTab }) {
 
   const menuItems = [
     { id: 'profile', label: 'Мои данные', icon: 'user' },
+    { id: 'cart', label: 'Корзина', icon: 'cart' }, // <--- Добавлено
     { id: 'orders', label: 'Мои заказы', icon: 'bag' },
     { id: 'favorites', label: 'Избранное', icon: 'heart' },
   ];

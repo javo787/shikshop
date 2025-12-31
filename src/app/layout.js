@@ -8,6 +8,7 @@ import NewUserPrompt from '@/components/NewUserPrompt';
 import AOSInitializer from '@/components/AOSInitializer';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
 import { FavoritesProvider } from '@/context/FavoritesContext'; // <--- 1. Импорт Context
+import { CartProvider } from '@/context/CartContext';
 import '@/styles/globals.css';
 
 const inter = Inter({
@@ -35,6 +36,7 @@ export default async function RootLayout({ children }) {
     messages = (await import(`../../messages/ru.json`)).default;
   }
 
+
   return (
     <html lang={locale} className={`${inter.variable} ${playfair.variable} dark`}>
       <head>
@@ -43,7 +45,8 @@ export default async function RootLayout({ children }) {
       <body className="bg-bg-light dark:bg-dark-teal font-sans flex flex-col min-h-screen">
         <GoogleAnalytics GA_MEASUREMENT_ID="G-QGF9MP9P5S" />
 
-        <NextIntlClientProvider locale={locale} messages={messages}>
+      <NextIntlClientProvider locale={locale} messages={messages}>
+        <CartProvider>
           <FavoritesProvider> {/* <--- 2. Оборачиваем весь сайт */}
             <Header locale={locale} />
             
@@ -54,8 +57,9 @@ export default async function RootLayout({ children }) {
             <NewUserPrompt />
             
             <AOSInitializer />
-          </FavoritesProvider>
-        </NextIntlClientProvider>
+         </FavoritesProvider>
+         </CartProvider>
+       </NextIntlClientProvider>
         
         <Script
           src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"

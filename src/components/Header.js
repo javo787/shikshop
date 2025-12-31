@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { setCookie } from 'cookies-next';
 import Icon from './Icon';
+import { useCart } from '@/context/CartContext'; // <--- Новый импорт для корзины
 
 export default function Header({ locale }) {
   const t = useTranslations('header');
@@ -16,6 +17,8 @@ export default function Header({ locale }) {
   
   // Состояние для отслеживания скролла
   const [isScrolled, setIsScrolled] = useState(false);
+
+  const { cartCount } = useCart(); // <--- Достаем количество товаров в корзине
 
   // Слушаем скролл
   useEffect(() => {
@@ -106,15 +109,20 @@ export default function Header({ locale }) {
                 </Link>
               )}
               
-              {/* Скрываем Login, если мы уже там */}
-              {pathname !== `/${selectedLocale}/login` && pathname !== '/login' && (
+              {/* Скрываем Profile, если мы уже там */}
+              {pathname !== `/${selectedLocale}/profile` && pathname !== '/profile' && (
                 <Link href="/profile" className="hover:text-primary-pink transition-transform hover:-translate-y-0.5">
                   <Icon name="login" className="w-6 h-6" />
                 </Link>
               )}
               
-              <Link href="/cart" className="hover:text-primary-pink transition-transform hover:-translate-y-0.5">
+              <Link href="/cart" className="hover:text-primary-pink transition-transform hover:-translate-y-0.5 relative group">
                 <Icon name="cart" className="w-6 h-6" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-accent-rose text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-sm">
+                    {cartCount}
+                  </span>
+                )}
               </Link>
             </div>
 
@@ -154,8 +162,13 @@ export default function Header({ locale }) {
                 </Link>
               )}
              
-             <Link href="/cart" className="hover:text-primary-pink">
+             <Link href="/cart" className="hover:text-primary-pink relative group">
               <Icon name="cart" className="w-6 h-6" />
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-accent-rose text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-sm">
+                  {cartCount}
+                </span>
+              )}
             </Link>
             
             <button onClick={toggleMenu} className="focus:outline-none transition-transform active:scale-95">
@@ -208,7 +221,7 @@ export default function Header({ locale }) {
                 <Icon name="contacts" className="w-5 h-5 text-accent-rose" />
                 <span>{t('contacts')}</span>
               </Link>
-              <Link href="/login" onClick={closeMenu} className="flex items-center space-x-4 p-3 rounded-xl hover:bg-secondary-peach/30 dark:hover:bg-white/5 transition-colors">
+              <Link href="/profile" onClick={closeMenu} className="flex items-center space-x-4 p-3 rounded-xl hover:bg-secondary-peach/30 dark:hover:bg-white/5 transition-colors">
                 <Icon name="login" className="w-5 h-5 text-accent-rose" />
                 <span>{t('login')}</span>
               </Link>

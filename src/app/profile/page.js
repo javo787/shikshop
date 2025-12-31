@@ -5,14 +5,14 @@ import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { getCookie } from 'cookies-next';
-
-// Импорт новых компонентов
-import ProfileSidebar from '@/components/profile/ProfileSidebar';
-import ProfileInfo from '@/components/profile/ProfileInfo';
-// Пока заглушки, но структура готова:
-// import ProfileOrders from '@/components/profile/ProfileOrders';
 import Link from 'next/link';
 import ClientImage from '@/components/ClientImage';
+
+// Импорт компонентов профиля
+import ProfileSidebar from '@/components/profile/ProfileSidebar';
+import ProfileInfo from '@/components/profile/ProfileInfo';
+// Импорт корзины
+import CartClient from '@/app/cart/CartClient'; // <--- Импортируем компонент корзины
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null); // Firebase User
@@ -21,7 +21,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('profile'); 
   const router = useRouter();
 
-  // Читаем имя из куки для быстрого отображения (пока грузится база)
+  // Читаем имя из куки для быстрого отображения
   const cookieName = getCookie('parizod_name');
 
   useEffect(() => {
@@ -30,7 +30,6 @@ export default function ProfilePage() {
         router.push('/login');
       } else {
         setUser(currentUser);
-        // Загружаем данные из нашей базы
         try {
           const res = await fetch(`/api/users/${currentUser.uid}`);
           if (res.ok) {
@@ -46,7 +45,6 @@ export default function ProfilePage() {
     return () => unsubscribe();
   }, [router]);
 
-  // Функция сохранения, которую мы передадим в ProfileInfo
   const handleSaveProfile = async (updatedData) => {
     try {
       const res = await fetch(`/api/users/${user.uid}`, {
@@ -101,6 +99,13 @@ export default function ProfilePage() {
                 userData={dbUser} 
                 onSave={handleSaveProfile} 
               />
+            )}
+
+            {/* Вкладка Корзина */}
+            {activeTab === 'cart' && (
+              <div className="animate-fadeIn">
+                 <CartClient />
+              </div>
             )}
 
             {activeTab === 'orders' && (
