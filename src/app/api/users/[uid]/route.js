@@ -30,10 +30,10 @@ export async function GET(request, { params }) {
   }
 }
 
-// PUT: Обновить данные пользователя (Имя, Телефон, Адрес)
+// PUT: Обновить данные пользователя
 export async function PUT(request, { params }) {
   try {
-    const { uid } = await params;
+    const { uid } = await params; // В Next.js 15 params нужно ждать
     const body = await request.json();
     
     await connectMongoDB();
@@ -45,13 +45,15 @@ export async function PUT(request, { params }) {
           name: body.name,
           phone: body.phone,
           address: body.address,
+          image: body.image, // <--- Добавляем обновление фото
         }
       },
-      { new: true } // Вернуть обновленный документ
+      { new: true }
     );
 
     return NextResponse.json(updatedUser, { status: 200 });
   } catch (error) {
+    console.error('Ошибка обновления профиля:', error);
     return NextResponse.json({ error: 'Ошибка обновления' }, { status: 500 });
   }
 }

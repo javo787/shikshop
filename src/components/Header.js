@@ -14,7 +14,7 @@ export default function Header({ locale }) {
   const [selectedLocale, setSelectedLocale] = useState(locale);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // Новое состояние для отслеживания скролла
+  // Состояние для отслеживания скролла
   const [isScrolled, setIsScrolled] = useState(false);
 
   // Слушаем скролл
@@ -44,7 +44,7 @@ export default function Header({ locale }) {
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
 
-  // Логика определения страницы (как в исходном коде)
+  // Логика определения страницы
   const isHome = pathname === `/${selectedLocale}` || pathname === '/';
   const showHomeIcon = !isHome;
 
@@ -53,21 +53,14 @@ export default function Header({ locale }) {
       <header
         className={`fixed w-full top-0 z-50 transition-all duration-300 ${
           isScrolled 
-            ? 'glass py-3 text-dark-teal dark:text-text-light' // При скролле: стекло + темный текст
-            : 'bg-transparent py-5 text-white' // Вверху: прозрачный фон + белый текст
+            ? 'glass py-3 text-dark-teal dark:text-text-light shadow-md' // При скролле: эффект стекла, компактный размер
+            : isHome 
+              ? 'bg-transparent py-5 text-white' // На главной вверху: прозрачный фон
+              : 'bg-white dark:bg-dark-teal py-5 text-dark-teal dark:text-text-light shadow-sm' // На других страницах вверху: белый/темный фон
         }`}
       >
-        {/* Подложка для страниц кроме главной (чтобы меню читалось, если нет баннера) */}
-        <div 
-          className={`absolute inset-0 -z-10 transition-opacity duration-300 ${
-            !isScrolled && !isHome 
-              ? 'bg-dark-teal/90 shadow-md' // Если не скроллим и не главная -> темный фон
-              : 'opacity-0' 
-          }`} 
-        />
-
         <nav className="max-w-7xl mx-auto px-4 flex justify-between items-center">
-          {/* Логотип с новым шрифтом */}
+          {/* Логотип */}
           <h1 className="text-3xl font-serif font-bold tracking-wider hover:scale-105 transition-transform">
             <Link href="/">{t('title')}</Link>
           </h1>
@@ -131,7 +124,7 @@ export default function Header({ locale }) {
                 className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
                   selectedLocale === 'ru' 
                     ? 'bg-primary-pink text-dark-teal shadow-md' 
-                    : 'hover:bg-white/20'
+                    : 'hover:bg-black/10 dark:hover:bg-white/20'
                 }`}
               >
                 RU
@@ -141,7 +134,7 @@ export default function Header({ locale }) {
                 className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
                   selectedLocale === 'tg' 
                     ? 'bg-primary-pink text-dark-teal shadow-md' 
-                    : 'hover:bg-white/20'
+                    : 'hover:bg-black/10 dark:hover:bg-white/20'
                 }`}
               >
                 TJ
@@ -151,7 +144,6 @@ export default function Header({ locale }) {
 
           {/* Мобильное меню (иконки + бургер) */}
           <div className="md:hidden flex items-center space-x-4">
-             {/* Показываем важные иконки даже на мобильном хедере */}
              {showHomeIcon ? (
                 <Link href="/" className="hover:text-primary-pink">
                   <Icon name="home" className="w-6 h-6" />
@@ -172,6 +164,13 @@ export default function Header({ locale }) {
           </div>
         </nav>
       </header>
+      
+      {/* ВАЖНО: Этот блок создает пространство под хедером на всех страницах, кроме главной.
+          Благодаря этому контент не прячется под фиксированной шапкой.
+      */}
+      {!isHome && (
+        <div className="h-[88px] w-full" aria-hidden="true"></div>
+      )}
 
       {/* Выдвижное мобильное меню (Стиль шторки) */}
       {isMenuOpen && (
