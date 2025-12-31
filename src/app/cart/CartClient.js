@@ -28,20 +28,29 @@ export default function CartClient() {
   
   const finalTotal = itemsTotal + finalShippingPrice;
 
-  // Обработчик кнопки "Купить сразу" у конкретного товара
-  const handleSingleBuy = (item) => {
-    setBuyNowItem(item);
-    setIsCheckingOut(true);
-    // Скролл наверх к форме
+  // --- ФУНКЦИИ УПРАВЛЕНИЯ (ИСПРАВЛЕНО) ---
+
+  // Кнопка "Оформить все" (для всей корзины)
+  const handleMainCheckout = () => {
+    setBuyNowItem(null); // Сбрасываем "купить один", значит покупаем всё
+    setIsCheckingOut(true); // Открываем форму
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Обработчик кнопки "Назад" из формы
-  const handleBack = () => {
-    setIsCheckingOut(false);
-    setBuyNowItem(null); // Сбрасываем выбор конкретного товара
+  // Кнопка "Купить сразу" (для одного товара)
+  const handleSingleBuy = (item) => {
+    setBuyNowItem(item);
+    setIsCheckingOut(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Кнопка "Назад"
+  const handleBack = () => {
+    setIsCheckingOut(false);
+    setBuyNowItem(null);
+  };
+
+  // Отправка заказа
   const handleOrderSubmit = async (e) => {
     e.preventDefault();
     setOrderStatus('loading');
@@ -62,7 +71,7 @@ export default function CartClient() {
 
       setOrderStatus('success');
       
-      // 4. УМНАЯ ОЧИСТКА
+      // Умная очистка
       if (buyNowItem) {
         // Если покупали один товар - удаляем только его
         removeFromCart(buyNowItem._id, buyNowItem.selectedSize);
@@ -77,6 +86,8 @@ export default function CartClient() {
       setOrderStatus('error');
     }
   };
+
+  // --- РЕНДЕРИНГ ---
 
   if (cart.length === 0 && orderStatus !== 'success') {
     return (
@@ -106,7 +117,7 @@ export default function CartClient() {
 
   return (
     <div className="container mx-auto px-0 md:px-4 py-6 md:py-8">
-      {/* Заголовок меняется в зависимости от режима */}
+      {/* Заголовок */}
       <h1 className="text-2xl md:text-3xl font-serif font-bold text-dark-teal dark:text-white mb-6 md:mb-8 px-4 md:px-0">
         {isCheckingOut 
           ? (buyNowItem ? 'Оформление товара' : 'Оформление заказа') 
@@ -117,12 +128,6 @@ export default function CartClient() {
       <div className="flex flex-col lg:flex-row gap-8">
         
         {/* ЛЕВАЯ КОЛОНКА: СПИСОК ТОВАРОВ */}
-        {/* Если мы оформляем один товар, показываем только его в списке слева (опционально), 
-            но обычно лучше оставить список как есть, просто скрыв ненужное, 
-            или показывать то, что покупаем. Ниже логика: 
-            Если isCheckingOut и выбран buyNowItem -> показываем только его.
-            Иначе показываем весь cart.
-        */}
         <div className={`flex-grow space-y-4 ${isCheckingOut && buyNowItem ? 'hidden md:block' : ''} px-4 md:px-0`}>
           {(isCheckingOut && buyNowItem ? [buyNowItem] : cart).map((item) => (
             <div key={`${item._id}-${item.selectedSize}`} className="bg-white dark:bg-white/5 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 flex gap-4 items-start relative overflow-hidden">
@@ -137,7 +142,7 @@ export default function CartClient() {
                         <Link href={`/product/${item._id}`} className="font-bold text-dark-teal dark:text-white hover:text-accent-rose transition-colors line-clamp-1 text-lg">
                         {item.name}
                         </Link>
-                        {/* Кнопка удаления (скрываем при оформлении конкретного товара) */}
+                        {/* Кнопка удаления (скрываем при оформлении) */}
                         {!isCheckingOut && (
                             <button onClick={() => removeFromCart(item._id, item.selectedSize)} className="text-gray-300 hover:text-red-500 transition-colors absolute top-4 right-4">
                                 <Icon name="close" className="w-5 h-5" />
@@ -161,7 +166,7 @@ export default function CartClient() {
                         {item.price * item.quantity} TJS
                       </p>
                       
-                      {/* КНОПКА "КУПИТЬ СРАЗУ" (Только если мы еще не в режиме оформления) */}
+                      {/* КНОПКА "КУПИТЬ ЭТОТ" */}
                       {!isCheckingOut && (
                         <button 
                             onClick={() => handleSingleBuy(item)}
@@ -210,6 +215,7 @@ export default function CartClient() {
               <span className="font-bold text-3xl text-accent-rose">{finalTotal} <span className="text-lg text-gray-500 font-normal">TJS</span></span>
             </div>
 
+            {/* КНОПКА ПЕРЕХОДА К ОФОРМЛЕНИЮ (ДЛЯ ВСЕХ ТОВАРОВ) */}
             {!isCheckingOut ? (
               <button 
                 onClick={handleMainCheckout} 
