@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectMongoDB } from '@/lib/mongodb';
 import Order from '@/models/Order';
+import User from '@/models/User'; // <--- 1. Импортируем модель User
 import { sendTelegramNotification } from '@/lib/telegram';
 
 export async function POST(req) {
@@ -12,7 +13,7 @@ export async function POST(req) {
 
     // Создаем заказ
     const newOrder = await Order.create({
-      user: userId || 'Guest', // Теперь здесь будет реальный ID юзера, если он вошел
+      user: userId || 'Guest', // Если пользователь вошел, здесь будет его ID
       items: items.map(item => ({
         product: item._id,
         name: item.name,
@@ -31,6 +32,22 @@ export async function POST(req) {
       status: 'new'
     });
 
+    // 2. НАЧИСЛЕНИЕ БОНУСОВ (ЛИМИТОВ) ЗА ПОКУПКУ
+    // Если заказ делает зарегистрированный пользователь, даем ему 30 попыток
+    if (userId && userId !== 'Guest') {
+      try {
+        await User.findByIdAndUpdate(userId, { 
+          tryOnBalance: 30, // Устанавливаем баланс примерок
+          hasPurchased: true // Отмечаем, что он совершал покупки
+        });
+        console.log(`Пользователю ${userId} начислено 30 попыток за покупку.`);
+      } catch (userError) {
+        console.error('Ошибка обновления лимитов пользователя:', userError);
+        // Не прерываем заказ, если не удалось обновить лимиты, просто логируем
+      }
+    }
+
+    // Отправка в Telegram
     try {
         if (typeof sendTelegramNotification === 'function') {
             await sendTelegramNotification(newOrder);
@@ -46,7 +63,7 @@ export async function POST(req) {
   }
 }
 
-// ОБНОВЛЕННЫЙ GET С ФИЛЬТРАЦИЕЙ
+// GET (Получение заказов с фильтрацией)
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -66,6 +83,7 @@ export async function GET(req) {
   }
 }
 
+// PUT (Обновление статуса)
 export async function PUT(req) {
   try {
     const body = await req.json();

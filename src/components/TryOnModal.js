@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import ClientImage from './ClientImage';
+import { auth } from '@/lib/firebase'; // Импортируем Auth
 
 // --- КОНСТАНТЫ ---
 const MAX_FILE_SIZE_MB = 10;
@@ -18,18 +19,29 @@ const COMPLIMENTS = [
 ];
 
 export default function TryOnModal({ isOpen, onClose, garmentImage }) {
+  // Основные состояния
   const [personImage, setPersonImage] = useState(null);
   const [generatedImage, setGeneratedImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [warning, setWarning] = useState(null); // Новое состояние для предупреждений
+  const [warning, setWarning] = useState(null);
   const [step, setStep] = useState('upload'); 
   const [compliment, setCompliment] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   
+  // Состояния для лимитов и пользователя
+  const [user, setUser] = useState(null);
+  const [remainingTries, setRemainingTries] = useState(null);
+  const [isLimitReached, setIsLimitReached] = useState(false);
+  
   const fileInputRef = useRef(null);
 
+  // 1. Следим за авторизацией и сбрасываем при закрытии
   useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((u) => {
+      setUser(u);
+    });
+
     if (!isOpen) {
       setTimeout(() => {
         setPersonImage(null);
@@ -39,11 +51,13 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
         setWarning(null);
         setLoading(false);
         setIsDragging(false);
+        setIsLimitReached(false); // Сброс блокировки
       }, 300);
     }
+    return () => unsubscribe();
   }, [isOpen]);
 
-  // Наложение логотипа
+  // Наложение логотипа (Ваша функция)
   const applyBranding = async (imageUrl) => {
     return new Promise((resolve) => {
       const img = new window.Image();
@@ -67,13 +81,9 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
           const brandedUrl = canvas.toDataURL('image/png');
           resolve(brandedUrl);
         };
-        logo.onerror = () => {
-          resolve(imageUrl);
-        };
+        logo.onerror = () => resolve(imageUrl);
       };
-      img.onerror = () => {
-        resolve(imageUrl);
-      };
+      img.onerror = () => resolve(imageUrl);
     });
   };
 
@@ -89,23 +99,14 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
       return;
     }
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setPersonImage(reader.result);
-    };
+    reader.onloadend = () => setPersonImage(reader.result);
     reader.readAsDataURL(file);
   };
 
-  const handleFileChange = (e) => {
-    processFile(e.target.files[0]);
-  };
-  const onDragOver = useCallback((e) => { 
-    e.preventDefault(); 
-    setIsDragging(true); 
-  }, []);
-  const onDragLeave = useCallback((e) => { 
-    e.preventDefault(); 
-    setIsDragging(false); 
-  }, []);
+  const handleFileChange = (e) => processFile(e.target.files[0]);
+  
+  const onDragOver = useCallback((e) => { e.preventDefault(); setIsDragging(true); }, []);
+  const onDragLeave = useCallback((e) => { e.preventDefault(); setIsDragging(false); }, []);
   const onDrop = useCallback((e) => {
     e.preventDefault(); 
     setIsDragging(false);
@@ -118,33 +119,50 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
     setLoading(true);
     setError(null);
     setWarning(null);
+    setIsLimitReached(false);
     setStep('processing');
 
     try {
-      // 1. ЗАПУСК
+      // 1. ЗАПУСК ГЕНЕРАЦИИ (Отправляем userId для проверки лимитов)
       const startResponse = await fetch('/api/try-on', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ personImage, garmentImage }),
+        body: JSON.stringify({ 
+          personImage, 
+          garmentImage,
+          userId: user?.uid || null // Передаем ID
+        }),
       });
 
+      const startData = await startResponse.json();
+
       if (!startResponse.ok) {
-        const errData = await startResponse.json();
-        throw new Error(errData.error || "Ошибка запуска");
+        // ОБРАБОТКА ОШИБОК ЛИМИТОВ
+        if (startData.error === 'LIMIT_REACHED_GUEST') {
+          setError('Гостевой лимит исчерпан! Зарегистрируйтесь, чтобы получить 3 попытки.');
+          setIsLimitReached(true);
+          setStep('upload'); // Возвращаем на экран загрузки, чтобы показать ошибку
+          setLoading(false);
+          return;
+        } 
+        if (startData.error === 'LIMIT_REACHED_BUY') {
+          setError('Лимит исчерпан! Оформите заказ, чтобы получить 30 попыток.');
+          setIsLimitReached(true);
+          setStep('upload');
+          setLoading(false);
+          return;
+        }
+        throw new Error(startData.error || "Ошибка запуска");
       }
 
-      let prediction = await startResponse.json();
+      let prediction = startData;
       
-      // ✅ Сохраняем предупреждение от сервера, если оно есть (про crop)
-      if (prediction.warning) {
-        setWarning(prediction.warning);
-      }
+      if (prediction.warning) setWarning(prediction.warning);
 
-      // 2. ЦИКЛ ПРОВЕРКИ
+      // 2. ЦИКЛ ПРОВЕРКИ (POLLING)
       while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
         await new Promise((resolve) => setTimeout(resolve, 3000));
         const checkResponse = await fetch(`/api/try-on?id=${prediction.id}`);
-        
         if (checkResponse.ok) {
            prediction = await checkResponse.json();
         }
@@ -157,6 +175,11 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
 
       let finalUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
       const brandedImage = await applyBranding(finalUrl);
+
+      // Обновляем остаток попыток, если сервер вернул его
+      if (prediction.remaining !== undefined) {
+        setRemainingTries(prediction.remaining);
+      }
 
       setCompliment(COMPLIMENTS[Math.floor(Math.random() * COMPLIMENTS.length)]);
       setGeneratedImage(brandedImage);
@@ -186,95 +209,105 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
     setError(null);
     setWarning(null);
     setPersonImage(null);
+    setIsLimitReached(false);
   };
 
   if (!isOpen) return null;
 
   // --- RENDER ---
-  const renderProcessing = () => {
-    return (
-      <div className="flex flex-col items-center justify-center h-[400px] text-center animate-fadeIn">
-        <div className="relative w-24 h-24 mb-8">
-          <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
-          <div className="absolute inset-0 border-4 border-pink-500 rounded-full border-t-transparent animate-spin"></div>
-          <div className="absolute inset-0 flex items-center justify-center text-2xl animate-pulse">✨</div>
-        </div>
-        <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-3">Создаем магию...</h4>
-        <p className="text-gray-500 max-w-xs mx-auto">Примерка займет около 30 секунд. Пожалуйста, не закрывайте окно.</p>
+  const renderProcessing = () => (
+    <div className="flex flex-col items-center justify-center h-[400px] text-center animate-fadeIn">
+      <div className="relative w-24 h-24 mb-8">
+        <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
+        <div className="absolute inset-0 border-4 border-pink-500 rounded-full border-t-transparent animate-spin"></div>
+        <div className="absolute inset-0 flex items-center justify-center text-2xl animate-pulse">✨</div>
       </div>
-    );
-  };
+      <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-3">Создаем магию...</h4>
+      <p className="text-gray-500 max-w-xs mx-auto">Примерка займет около 30 секунд. Пожалуйста, не закрывайте окно.</p>
+    </div>
+  );
 
-  const renderResult = () => {
-    return (
-      <div className="flex flex-col items-center animate-slideUp">
-        <div className="text-center mb-4">
-          <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600 mb-2 drop-shadow-sm">{compliment}</h2>
-          <p className="text-gray-500 text-sm">Готово! Образ сохранен в высоком качестве.</p>
-        </div>
-
-        {/* ⚠️ Блок предупреждения (если есть) */}
-        {warning && (
-          <div className="w-full max-w-md mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 rounded-xl text-sm flex items-start gap-3 shadow-sm">
-            <span className="text-xl">⚠️</span>
-            <span>{warning}</span>
-          </div>
+  const renderResult = () => (
+    <div className="flex flex-col items-center animate-slideUp">
+      <div className="text-center mb-4">
+        <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600 mb-2 drop-shadow-sm">{compliment}</h2>
+        <p className="text-gray-500 text-sm">Готово! Образ сохранен в высоком качестве.</p>
+        
+        {/* Показываем остаток попыток */}
+        {remainingTries !== null && (
+          <p className="text-xs text-gray-400 mt-1">Осталось попыток: <b>{remainingTries}</b></p>
         )}
+      </div>
 
-        <div className="relative w-full max-w-md aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl mb-8 group ring-4 ring-pink-50 dark:ring-gray-800 bg-gray-100">
-          <img src={generatedImage} alt="Результат" className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105"/>
+      {warning && (
+        <div className="w-full max-w-md mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 rounded-xl text-sm flex items-start gap-3 shadow-sm">
+          <span className="text-xl">⚠️</span>
+          <span>{warning}</span>
         </div>
-        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-          <button onClick={handleDownload} className="flex-1 px-8 py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl font-bold shadow-lg shadow-pink-500/30 hover:shadow-pink-500/50 hover:-translate-y-1 transition-all flex items-center justify-center gap-2 group active:scale-95">
-            <svg className="w-6 h-6 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Скачать фото
-          </button>
-          <button onClick={reset} className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 text-gray-700 dark:text-white rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 active:scale-95">Ещё раз</button>
+      )}
+
+      <div className="relative w-full max-w-md aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl mb-8 group ring-4 ring-pink-50 dark:ring-gray-800 bg-gray-100">
+        <img src={generatedImage} alt="Результат" className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105"/>
+      </div>
+      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+        <button onClick={handleDownload} className="flex-1 px-8 py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl font-bold shadow-lg shadow-pink-500/30 hover:shadow-pink-500/50 hover:-translate-y-1 transition-all flex items-center justify-center gap-2 group active:scale-95">
+          <svg className="w-6 h-6 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Скачать фото
+        </button>
+        <button onClick={reset} className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 text-gray-700 dark:text-white rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 active:scale-95">Ещё раз</button>
+      </div>
+    </div>
+  );
+
+  const renderUpload = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 h-full">
+      <div className="flex flex-col gap-4 group h-full">
+        <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">1</span> Ваше фото</p>
+        
+        {/* Инфо-блок о лимитах */}
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300 flex gap-2 items-start">
+            <span className="text-lg">ℹ️</span>
+            <div>
+              {!user ? (
+                 <>Вы <b>Гость</b> (1 попытка). <a href="/register" className="underline font-bold hover:text-blue-500">Войдите</a>, чтобы получить 3.</>
+              ) : (
+                 <>У вас есть <b>лимитированные</b> попытки. Купите любой товар, чтобы получить 30!</>
+              )}
+            </div>
+        </div>
+
+        <div className={`flex-1 rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer flex flex-col items-center justify-center p-4 min-h-[250px] relative overflow-hidden ${isDragging ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20 scale-[1.02]' : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-pink-400 hover:bg-white'}`} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onClick={() => !personImage && fileInputRef.current?.click()}>
+          {personImage ? (
+            <>
+              <Image src={personImage} alt="Вы" fill className="object-cover rounded-xl" unoptimized />
+              <button onClick={(e) => { e.stopPropagation(); setPersonImage(null); setIsLimitReached(false); }} className="absolute top-3 right-3 bg-white/90 backdrop-blur rounded-full p-2.5 shadow-lg text-red-500 hover:bg-red-50 hover:scale-110 transition-all z-10"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </>
+          ) : (
+            <div className="text-center p-6 transition-transform group-hover:scale-105 pointer-events-none">
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl transition-colors ${isDragging ? 'bg-pink-200 text-pink-600' : 'bg-pink-100 text-pink-500'}`}>{isDragging ? '📂' : '📸'}</div>
+              <span className="font-bold text-lg text-gray-700 dark:text-gray-200 block mb-1">{isDragging ? 'Отпускайте!' : 'Загрузить фото'}</span>
+            </div>
+          )}
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} accept={ALLOWED_TYPES.join(',')} className="hidden" />
+        </div>
+        
+        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
+          <h5 className="font-bold text-gray-700 dark:text-gray-300 text-sm mb-2 flex items-center gap-2">💡 Советы:</h5>
+          <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1.5 list-disc pl-4">
+             <li>📸 Используйте фото в полный рост</li>
+             <li>👗 Лучше работает с облегающей одеждой</li>
+             <li>💡 Избегайте темных фото</li>
+          </ul>
         </div>
       </div>
-    );
-  };
 
-  const renderUpload = () => {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 h-full">
-        <div className="flex flex-col gap-4 group h-full">
-          <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">1</span> Ваше фото</p>
-          <div className={`flex-1 rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer flex flex-col items-center justify-center p-4 min-h-[250px] relative overflow-hidden ${isDragging ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20 scale-[1.02]' : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-pink-400 hover:bg-white'}`} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onClick={() => !personImage && fileInputRef.current?.click()}>
-            {personImage ? (
-              <>
-                <Image src={personImage} alt="Вы" fill className="object-cover rounded-xl" unoptimized />
-                <button onClick={(e) => { e.stopPropagation(); setPersonImage(null); }} className="absolute top-3 right-3 bg-white/90 backdrop-blur rounded-full p-2.5 shadow-lg text-red-500 hover:bg-red-50 hover:scale-110 transition-all z-10"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"></path></svg></button>
-              </>
-            ) : (
-              <div className="text-center p-6 transition-transform group-hover:scale-105 pointer-events-none">
-                <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl transition-colors ${isDragging ? 'bg-pink-200 text-pink-600' : 'bg-pink-100 text-pink-500'}`}>{isDragging ? '📂' : '📸'}</div>
-                <span className="font-bold text-lg text-gray-700 dark:text-gray-200 block mb-1">{isDragging ? 'Отпускайте!' : 'Загрузить фото'}</span>
-              </div>
-            )}
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept={ALLOWED_TYPES.join(',')} className="hidden" />
-          </div>
-          
-          {/* 💡 Блок с рекомендациями */}
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
-            <h5 className="font-bold text-blue-700 dark:text-blue-300 text-sm mb-2 flex items-center gap-2">💡 Советы для лучшего результата:</h5>
-            <ul className="text-xs text-blue-600 dark:text-blue-200 space-y-1.5 list-disc pl-4">
-               <li>📸 <b>Формат 3:4:</b> Используйте вертикальное фото.</li>
-               <li>🧍‍♀️ <b>Полный рост:</b> Убедитесь, что вас видно полностью.</li>
-               <li>👗 <b>Одежда:</b> Лучше всего работает, если на вас облегающая одежда или платье.</li>
-               <li>💡 <b>Свет:</b> Избегайте темных фото и сильных теней.</li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-4 h-full">
-          <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">2</span> Одежда</p>
-          <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center justify-center p-4 min-h-[300px] relative shadow-inner">
-            {garmentImage ? (<ClientImage src={garmentImage} alt="Одежда" fill className="object-contain p-4 transition-transform hover:scale-110 duration-500" />) : (<div className="flex flex-col items-center text-gray-400"><p>Нет фото</p></div>)}
-          </div>
+      <div className="flex flex-col gap-4 h-full">
+        <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">2</span> Одежда</p>
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center justify-center p-4 min-h-[300px] relative shadow-inner">
+          {garmentImage ? (<ClientImage src={garmentImage} alt="Одежда" fill className="object-contain p-4 transition-transform hover:scale-110 duration-500" />) : (<div className="flex flex-col items-center text-gray-400"><p>Нет фото</p></div>)}
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn duration-300">
@@ -288,12 +321,31 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
           {step === 'processing' && renderProcessing()}
           {step === 'result' && generatedImage && renderResult()}
           {step === 'upload' && renderUpload()}
-          {error && (<div className="mt-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl flex items-center gap-3 animate-shake shadow-sm"><span className="font-medium">{error}</span></div>)}
+          {error && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl flex flex-col items-center gap-2 animate-shake shadow-sm">
+              <span className="font-medium text-center">{error}</span>
+              {/* Если лимит исчерпан, показываем кнопку регистрации/покупки */}
+              {isLimitReached && (
+                 !user ? (
+                   <a href="/register" className="text-sm bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">Зарегистрироваться</a>
+                 ) : (
+                   <button onClick={onClose} className="text-sm bg-dark-teal text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition">Вернуться к покупкам</button>
+                 )
+              )}
+            </div>
+          )}
         </div>
         {step === 'upload' && (
           <div className="p-5 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-4 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <button onClick={onClose} className="px-6 py-3 text-gray-500 hover:text-gray-800 font-medium transition-colors rounded-xl hover:bg-gray-100 dark:hover:text-white dark:hover:bg-gray-700">Отмена</button>
-            <button onClick={handleTryOn} disabled={!personImage || loading} className={`px-8 py-3 rounded-xl text-white font-bold shadow-lg transition-all transform flex items-center gap-2 ${personImage && !loading ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:shadow-pink-500/40 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none' : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-70'}`}>
+            <button 
+              onClick={handleTryOn} 
+              disabled={!personImage || loading || isLimitReached} 
+              className={`px-8 py-3 rounded-xl text-white font-bold shadow-lg transition-all transform flex items-center gap-2 
+                ${personImage && !loading && !isLimitReached 
+                  ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:shadow-pink-500/40 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none' 
+                  : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-70'}`}
+            >
               {loading ? <>Обработка...</> : <>✨ Примерить</>}
             </button>
           </div>
