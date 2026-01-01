@@ -3,11 +3,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import ClientImage from './ClientImage';
-import { auth } from '@/lib/firebase'; // Импортируем Auth
+import { auth } from '@/lib/firebase';
 
 // --- КОНСТАНТЫ ---
-// Разрешаем выбирать большие файлы (до 30МБ), так как мы их все равно сожмем
-const MAX_INPUT_SIZE_MB = 30; 
+const MAX_INPUT_SIZE_MB = 30; // Разрешаем выбирать большие файлы (до 30МБ), так как мы их сожмем
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
 const LOGO_PATH = '/images/logo.png'; 
 
@@ -141,15 +140,12 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
       return;
     }
 
-    // Проверяем входной размер (на всякий случай, чтобы браузер не завис от 100МБ файла)
     if (file.size > MAX_INPUT_SIZE_MB * 1024 * 1024) {
       setError(`Файл слишком большой. Максимум ${MAX_INPUT_SIZE_MB} МБ.`);
       return;
     }
 
     try {
-        // Если файл больше 2МБ, сжимаем его. Если меньше - оставляем как есть или тоже нормализуем.
-        // Лучше прогонять через сжатие всегда, чтобы гарантировать формат и размер для API.
         const compressedImage = await compressImage(file);
         setPersonImage(compressedImage);
     } catch (err) {
@@ -264,7 +260,8 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
 
   if (!isOpen) return null;
 
-  // --- RENDER ---
+  // --- RENDER FUNCTIONS ---
+  
   const renderProcessing = () => (
     <div className="flex flex-col items-center justify-center h-[400px] text-center animate-fadeIn">
       <div className="relative w-24 h-24 mb-8">
@@ -357,6 +354,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
     </div>
   );
 
+  // --- MAIN RETURN ---
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn duration-300">
       <div className="absolute inset-0" onClick={onClose}></div>
@@ -372,7 +370,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
           {error && (
             <div className="mt-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl flex flex-col items-center gap-2 animate-shake shadow-sm">
               <span className="font-medium text-center">{error}</span>
-              {/* Если лимит исчерпан, показываем кнопку регистрации/покупки */}
               {isLimitReached && (
                  !user ? (
                    <a href="/register" className="text-sm bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">Зарегистрироваться</a>
@@ -383,7 +380,8 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
             </div>
           )}
         </div>
-        {step === 'upload' &&    <div className="p-5 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-4 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm">
+        {step === 'upload' && (
+          <div className="p-5 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-4 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <button onClick={onClose} className="px-6 py-3 text-gray-500 hover:text-gray-800 font-medium transition-colors rounded-xl hover:bg-gray-100 dark:hover:text-white dark:hover:bg-gray-700">Отмена</button>
             <button 
               onClick={handleTryOn} 
@@ -396,7 +394,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
               {loading ? <>Обработка...</> : <>✨ Примерить</>}
             </button>
           </div>
-       )}
+        )}
       </div>
     </div>
   );
