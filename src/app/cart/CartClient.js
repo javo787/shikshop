@@ -1,56 +1,81 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCart } from '@/context/CartContext';
 import Link from 'next/link';
 import ClientImage from '@/components/ClientImage';
 import Icon from '@/components/Icon';
+// 👇 Импорты для связи с профилем
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function CartClient() {
   const { cart, removeFromCart, updateQuantity, clearCart } = useCart();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const [formData, setFormData] = useState({ name: '', phone: '', address: '' });
-  const [orderStatus, setOrderStatus] = useState(null); // 'loading', 'success', 'error'
   
-  // Состояние: если null - покупаем всю корзину, если объект - покупаем конкретный товар
+  // Данные формы (Имя, Телефон, Адрес)
+  const [formData, setFormData] = useState({ name: '', phone: '', address: '' });
+  
+  const [orderStatus, setOrderStatus] = useState(null); 
   const [buyNowItem, setBuyNowItem] = useState(null);
+  
+  // 👇 Состояние для пользователя
+  const [user, setUser] = useState(null); // Firebase User
+  const [dbUser, setDbUser] = useState(null); // MongoDB User (с данными из базы)
 
-  // 1. ОПРЕДЕЛЯЕМ, КАКИЕ ТОВАРЫ МЫ СЕЙЧАС ПОКУПАЕМ
+  // 1. ПРИ ЗАГРУЗКЕ: Проверяем, кто вошел, и подтягиваем данные
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        try {
+          // Загружаем профиль из MongoDB
+          const res = await fetch(`/api/users/${currentUser.uid}`);
+          if (res.ok) {
+            const data = await res.json();
+            setDbUser(data);
+            
+            // АВТОЗАПОЛНЕНИЕ: Если в профиле есть данные, ставим их в форму
+            // Если пользователь уже начал что-то писать (prev), не стираем это
+            setFormData(prev => ({
+              name: data.name || prev.name || '',
+              phone: data.phone || prev.phone || '',
+              address: data.address || prev.address || '',
+            }));
+          }
+        } catch (error) {
+          console.error("Ошибка загрузки профиля в корзине:", error);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   const itemsToCheckout = buyNowItem ? [buyNowItem] : cart;
-
-  // 2. СЧИТАЕМ СУММУ ТОЛЬКО ДЛЯ ВЫБРАННЫХ ТОВАРОВ
   const itemsTotal = itemsToCheckout.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   
-  // 3. ЛОГИКА ДОСТАВКИ (Бесплатно от 250 TJS)
-  const SHIPPING_COST = 20; // Стоимость доставки по умолчанию
+  const SHIPPING_COST = 20; 
   const isFreeShipping = itemsTotal >= 250;
   const finalShippingPrice = isFreeShipping ? 0 : SHIPPING_COST;
-  
   const finalTotal = itemsTotal + finalShippingPrice;
 
-  // --- ФУНКЦИИ УПРАВЛЕНИЯ (ИСПРАВЛЕНО) ---
-
-  // Кнопка "Оформить все" (для всей корзины)
   const handleMainCheckout = () => {
-    setBuyNowItem(null); // Сбрасываем "купить один", значит покупаем всё
-    setIsCheckingOut(true); // Открываем форму
+    setBuyNowItem(null);
+    setIsCheckingOut(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Кнопка "Купить сразу" (для одного товара)
   const handleSingleBuy = (item) => {
     setBuyNowItem(item);
     setIsCheckingOut(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Кнопка "Назад"
   const handleBack = () => {
     setIsCheckingOut(false);
     setBuyNowItem(null);
   };
 
-  // Отправка заказа
   const handleOrderSubmit = async (e) => {
     e.preventDefault();
     setOrderStatus('loading');
@@ -60,10 +85,12 @@ export default function CartClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: itemsToCheckout, // Отправляем или всю корзину, или один товар
+          items: itemsToCheckout,
           totalAmount: finalTotal,
-          shippingAddress: formData,
-          paymentMethod: 'cash_on_delivery'
+          shippingAddress: formData, // Отправляем данные из формы (даже если пользователь их изменил)
+          paymentMethod: 'cash_on_delivery',
+          // 👇 ВАЖНО: Привязываем заказ к ID пользователя (если он есть)
+          userId: dbUser?._id || 'Guest' 
         }),
       });
 
@@ -71,23 +98,17 @@ export default function CartClient() {
 
       setOrderStatus('success');
       
-      // Умная очистка
       if (buyNowItem) {
-        // Если покупали один товар - удаляем только его
         removeFromCart(buyNowItem._id, buyNowItem.selectedSize);
       } else {
-        // Если покупали всё - чистим всю корзину
         clearCart();
       }
-      
       setBuyNowItem(null);
     } catch (error) {
       console.error(error);
       setOrderStatus('error');
     }
   };
-
-  // --- РЕНДЕРИНГ ---
 
   if (cart.length === 0 && orderStatus !== 'success') {
     return (
@@ -117,7 +138,6 @@ export default function CartClient() {
 
   return (
     <div className="container mx-auto px-0 md:px-4 py-6 md:py-8">
-      {/* Заголовок */}
       <h1 className="text-2xl md:text-3xl font-serif font-bold text-dark-teal dark:text-white mb-6 md:mb-8 px-4 md:px-0">
         {isCheckingOut 
           ? (buyNowItem ? 'Оформление товара' : 'Оформление заказа') 
@@ -142,7 +162,6 @@ export default function CartClient() {
                         <Link href={`/product/${item._id}`} className="font-bold text-dark-teal dark:text-white hover:text-accent-rose transition-colors line-clamp-1 text-lg">
                         {item.name}
                         </Link>
-                        {/* Кнопка удаления (скрываем при оформлении) */}
                         {!isCheckingOut && (
                             <button onClick={() => removeFromCart(item._id, item.selectedSize)} className="text-gray-300 hover:text-red-500 transition-colors absolute top-4 right-4">
                                 <Icon name="close" className="w-5 h-5" />
@@ -166,7 +185,6 @@ export default function CartClient() {
                         {item.price * item.quantity} TJS
                       </p>
                       
-                      {/* КНОПКА "КУПИТЬ ЭТОТ" */}
                       {!isCheckingOut && (
                         <button 
                             onClick={() => handleSingleBuy(item)}
@@ -215,7 +233,6 @@ export default function CartClient() {
               <span className="font-bold text-3xl text-accent-rose">{finalTotal} <span className="text-lg text-gray-500 font-normal">TJS</span></span>
             </div>
 
-            {/* КНОПКА ПЕРЕХОДА К ОФОРМЛЕНИЮ (ДЛЯ ВСЕХ ТОВАРОВ) */}
             {!isCheckingOut ? (
               <button 
                 onClick={handleMainCheckout} 

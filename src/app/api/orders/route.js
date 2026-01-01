@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectMongoDB } from '@/lib/mongodb';
 import Order from '@/models/Order';
-import { sendTelegramNotification } from '@/lib/telegram'; // Если вы уже создали этот файл
+import { sendTelegramNotification } from '@/lib/telegram';
 
 export async function POST(req) {
   try {
@@ -12,7 +12,7 @@ export async function POST(req) {
 
     // Создаем заказ
     const newOrder = await Order.create({
-      user: userId || 'Guest', // Теперь модель это примет
+      user: userId || 'Guest', // Теперь здесь будет реальный ID юзера, если он вошел
       items: items.map(item => ({
         product: item._id,
         name: item.name,
@@ -23,7 +23,7 @@ export async function POST(req) {
       })),
       totalAmount,
       shippingAddress: {
-          name: shippingAddress.name, // Убедитесь, что имена полей совпадают
+          name: shippingAddress.name,
           phone: shippingAddress.phone,
           address: shippingAddress.address
       },
@@ -31,7 +31,6 @@ export async function POST(req) {
       status: 'new'
     });
 
-    // Попытка отправить уведомление в Telegram (не блокирует создание заказа при ошибке)
     try {
         if (typeof sendTelegramNotification === 'function') {
             await sendTelegramNotification(newOrder);
@@ -40,29 +39,33 @@ export async function POST(req) {
         console.error('Ошибка Telegram:', tgError);
     }
 
-    return NextResponse.json(
-      { message: 'Order created', orderId: newOrder.orderNumber },
-      { status: 201 }
-    );
-
+    return NextResponse.json({ message: 'Order created', orderId: newOrder.orderNumber }, { status: 201 });
   } catch (error) {
-    console.error('Order API Error:', error); // Эту ошибку вы видели в логах
+    console.error('Order API Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// Метод GET для админки
+// ОБНОВЛЕННЫЙ GET С ФИЛЬТРАЦИЕЙ
 export async function GET(req) {
   try {
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get('userId');
+
     await connectMongoDB();
-    const orders = await Order.find().sort({ createdAt: -1 });
+    
+    let query = {};
+    if (userId) {
+      query = { user: userId }; // Фильтруем по ID пользователя
+    }
+
+    const orders = await Order.find(query).sort({ createdAt: -1 });
     return NextResponse.json(orders);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
   }
 }
 
-// Метод PUT для обновления статуса
 export async function PUT(req) {
   try {
     const body = await req.json();
