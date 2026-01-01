@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { connectMongoDB } from '@/lib/mongodb';
 import Order from '@/models/Order';
-import User from '@/models/User'; // <--- 1. Импортируем модель User
+import User from '@/models/User'; 
 import { sendTelegramNotification } from '@/lib/telegram';
 
+// --- CREATE ORDER (POST) ---
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -11,9 +12,9 @@ export async function POST(req) {
 
     await connectMongoDB();
 
-    // Создаем заказ
+    // 1. Создаем заказ
     const newOrder = await Order.create({
-      user: userId || 'Guest', // Если пользователь вошел, здесь будет его ID
+      user: userId || 'Guest',
       items: items.map(item => ({
         product: item._id,
         name: item.name,
@@ -32,19 +33,11 @@ export async function POST(req) {
       status: 'new'
     });
 
-    // 2. НАЧИСЛЕНИЕ БОНУСОВ (ЛИМИТОВ) ЗА ПОКУПКУ
-    // Если заказ делает зарегистрированный пользователь, даем ему 30 попыток
+    // ⚠️ ИЗМЕНЕНИЕ: Мы УБРАЛИ начисление попыток здесь. 
+    // Бонусы теперь только после доставки (см. PUT ниже).
+    // Если нужно просто отметить, что юзер совершал покупки (для статистики), можно оставить:
     if (userId && userId !== 'Guest') {
-      try {
-        await User.findByIdAndUpdate(userId, { 
-          tryOnBalance: 30, // Устанавливаем баланс примерок
-          hasPurchased: true // Отмечаем, что он совершал покупки
-        });
-        console.log(`Пользователю ${userId} начислено 30 попыток за покупку.`);
-      } catch (userError) {
-        console.error('Ошибка обновления лимитов пользователя:', userError);
-        // Не прерываем заказ, если не удалось обновить лимиты, просто логируем
-      }
+        await User.findByIdAndUpdate(userId, { hasPurchased: true });
     }
 
     // Отправка в Telegram
@@ -63,7 +56,7 @@ export async function POST(req) {
   }
 }
 
-// GET (Получение заказов с фильтрацией)
+// --- GET ORDERS (GET) ---
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -73,7 +66,7 @@ export async function GET(req) {
     
     let query = {};
     if (userId) {
-      query = { user: userId }; // Фильтруем по ID пользователя
+      query = { user: userId };
     }
 
     const orders = await Order.find(query).sort({ createdAt: -1 });
@@ -83,15 +76,38 @@ export async function GET(req) {
   }
 }
 
-// PUT (Обновление статуса)
+// --- UPDATE STATUS (PUT) ---
 export async function PUT(req) {
   try {
     const body = await req.json();
-    const { id, status } = body;
+    const { id, status } = body; // id заказа, новый статус
+    
     await connectMongoDB();
+    
+    // 1. Обновляем статус заказа
     const updatedOrder = await Order.findByIdAndUpdate(id, { status }, { new: true });
+
+    if (!updatedOrder) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    // 2. 🔥 ЛОГИКА НАЧИСЛЕНИЯ БОНУСОВ 🔥
+    // Если статус сменился на "delivered" (Доставлен)
+    if (status === 'delivered') {
+       // Проверяем, что заказ принадлежит зарегистрированному юзеру
+       if (updatedOrder.user && updatedOrder.user !== 'Guest') {
+          // Ищем пользователя и добавляем ему 20 попыток ($inc увеличивает текущее значение)
+          await User.findByIdAndUpdate(updatedOrder.user, {
+             $inc: { tryOnBalance: 20 },
+             hasPurchased: true 
+          });
+          console.log(`Пользователю ${updatedOrder.user} начислено +20 попыток за доставленный заказ.`);
+       }
+    }
+
     return NextResponse.json(updatedOrder);
   } catch (error) {
+    console.error('Update Order Error:', error);
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
   }
 }

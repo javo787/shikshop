@@ -1,12 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  GoogleAuthProvider, // 1. Импорт провайдера Google
+  signInWithPopup     // 1. Импорт функции всплывающего окна
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-// Иконки глаза (SVG) встроены прямо сюда для надежности
+// Иконки (Eye, EyeSlash, Google)
 const EyeIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
@@ -20,18 +25,25 @@ const EyeSlashIcon = () => (
   </svg>
 );
 
+const GoogleIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+  </svg>
+);
+
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: '+992', // Начальное значение
+    phone: '+992',
     password: '',
     confirmPassword: ''
   });
 
-  // Состояния для ошибок полей
   const [errors, setErrors] = useState({});
-  // Состояния для видимости паролей
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
@@ -39,55 +51,63 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // Логика ввода телефона (только цифры, фикс. +992, макс длина)
+  // Логика ввода телефона
   const handlePhoneChange = (e) => {
     let val = e.target.value;
-    
-    // Если пользователь пытается стереть +992, не даем ему
-    if (!val.startsWith('+992')) {
-      val = '+992';
-    }
-
-    // Оставляем только цифры и плюс
+    if (!val.startsWith('+992')) val = '+992';
     const digitsOnly = val.replace(/[^\d+]/g, '');
-    
-    // Ограничиваем длину: +992 (4 символа) + 9 цифр номера = 13 символов
     if (digitsOnly.length <= 13) {
       setFormData({ ...formData, phone: digitsOnly });
-      // Сбрасываем ошибку телефона при вводе
       if (errors.phone) setErrors({ ...errors, phone: null });
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
-    
-    // Валидация имени
     if (!formData.name.trim()) newErrors.name = 'Введите ваше имя';
-
-    // Валидация Email
     if (!formData.email.includes('@')) newErrors.email = 'Некорректный Email';
-
-    // Валидация телефона (+992 и ровно 9 цифр после)
-    if (formData.phone.length !== 13) {
-      newErrors.phone = 'Номер должен содержать 9 цифр после кода +992';
-    }
-
-    // Валидация пароля
-    if (formData.password.length < 6) {
-      newErrors.password = 'Пароль должен быть не менее 6 символов';
-    }
-
-    // Проверка совпадения паролей
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Пароли не совпадают';
-    }
-
+    if (formData.phone.length !== 13) newErrors.phone = 'Номер должен содержать 9 цифр после кода +992';
+    if (formData.password.length < 6) newErrors.password = 'Пароль должен быть не менее 6 символов';
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Пароли не совпадают';
     setErrors(newErrors);
-    // Возвращаем true, если ошибок нет (ключей в объекте 0)
     return Object.keys(newErrors).length === 0;
   };
 
+  // 2. Обработчик входа через Google
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setGlobalError(null);
+    const provider = new GoogleAuthProvider();
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Синхронизация с базой данных
+      // Google не всегда отдает телефон, поэтому отправляем пустую строку или то, что есть
+      const res = await fetch('/api/users/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firebaseUid: user.uid,
+          email: user.email,
+          name: user.displayName || 'Google User',
+          phone: user.phoneNumber || '' 
+        }),
+      });
+
+      if (!res.ok) throw new Error('Ошибка синхронизации данных');
+
+      router.push('/profile');
+    } catch (error) {
+      console.error(error);
+      setGlobalError('Не удалось войти через Google. Попробуйте еще раз.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Обработчик обычной регистрации
   const handleSubmit = async (e) => {
     e.preventDefault();
     setGlobalError(null);
@@ -97,14 +117,11 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // 1. Создаем аккаунт в Firebase
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
-      // 2. Обновляем имя
       await updateProfile(user, { displayName: formData.name });
 
-      // 3. Сохраняем в MongoDB
       const res = await fetch('/api/users/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -183,7 +200,7 @@ export default function RegisterPage() {
                 ${errors.phone ? 'border-red-500' : 'border-gray-200 dark:border-white/10 focus:border-primary-pink'}`}
               value={formData.phone}
               onChange={handlePhoneChange}
-              maxLength={13} // +992 (4) + 9 цифр = 13
+              maxLength={13} 
             />
             {errors.phone && <p className="text-red-500 text-xs mt-1 ml-1">{errors.phone}</p>}
           </div>
@@ -242,6 +259,23 @@ export default function RegisterPage() {
             <span className="relative z-10">{loading ? 'Создаем аккаунт...' : 'Зарегистрироваться'}</span>
           </button>
         </form>
+
+        {/* 3. Разделитель и Кнопка Google */}
+        <div className="flex items-center my-6">
+          <div className="flex-1 h-px bg-gray-200 dark:bg-white/10"></div>
+          <span className="px-4 text-sm text-gray-400">или</span>
+          <div className="flex-1 h-px bg-gray-200 dark:bg-white/10"></div>
+        </div>
+
+        <button 
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200 font-medium"
+        >
+          <GoogleIcon />
+          Продолжить с Google
+        </button>
 
         <p className="text-center mt-6 text-gray-500 text-sm">
           Уже есть аккаунт? <Link href="/login" className="text-accent-rose hover:underline font-medium">Войти</Link>

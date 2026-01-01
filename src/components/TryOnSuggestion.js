@@ -31,16 +31,16 @@ export default function TryOnSuggestion({ onOpen }) {
           <div className="text-3xl animate-bounce-slow">👗</div>
           <div>
             <h4 className="font-bold text-dark-teal dark:text-white text-sm mb-1">
-              Не уверены в размере?
+              Подойдет ли вам этот фасон?
             </h4>
             <p className="text-xs text-gray-500 dark:text-gray-300 mb-2">
-              Примерьте это платье на своё фото прямо сейчас! Это бесплатно.
+              Загрузите свое фото и посмотрите, как этот наряд смотрится именно на вас.
             </p>
             <button 
               onClick={onOpen}
               className="text-xs font-bold text-white bg-gradient-to-r from-accent-rose to-primary-pink px-3 py-1.5 rounded-lg hover:shadow-lg transition-all"
             >
-              Попробовать онлайн
+              Примерить образ
             </button>
           </div>
         </div>
