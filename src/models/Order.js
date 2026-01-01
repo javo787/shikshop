@@ -1,87 +1,63 @@
 import mongoose from 'mongoose';
 
-const OrderSchema = new mongoose.Schema({
-  // Связь с пользователем (кто заказал)
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  
-  // Уникальный читаемый номер заказа (например, 10001, 10002)
-  orderNumber: {
-    type: Number,
-    unique: true,
-  },
+const OrderSchema = new mongoose.Schema(
+  {
+    // ИСПРАВЛЕНО: Разрешаем хранить здесь и ID (если вошел), и строку "Guest" (если не вошел)
+    user: {
+      type: mongoose.Schema.Types.Mixed, 
+      required: true,
+      default: 'Guest'
+    },
+    
+    orderNumber: {
+      type: String, // Лучше String для генерации красивых ID
+      unique: true,
+    },
 
-  // Состав заказа (Массив товаров)
-  items: [
-    {
-      product: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Product',
-        required: true,
+    items: [
+      {
+        product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+        name: String,
+        price: Number,
+        image: String,
+        quantity: Number,
+        size: String,
       },
-      // ВАЖНО: Сохраняем данные товара "как есть" на момент покупки (Snapshot)
-      // Если товар удалят из базы или изменится цена, в заказе останутся верные данные
-      name: { type: String, required: true },
-      price: { type: Number, required: true }, // Цена за единицу на момент покупки
-      image: { type: String },
-      quantity: { type: Number, required: true, min: 1 },
-      size: { type: String }, // Если есть размеры
-    }
-  ],
+    ],
+    
+    totalAmount: {
+      type: Number,
+      required: true,
+    },
+    
+    // ИСПРАВЛЕНО: Меняем fullName на name, чтобы совпадало с формой на сайте
+    shippingAddress: {
+      name: { type: String, required: true }, // <--- Было fullName
+      phone: { type: String, required: true },
+      address: { type: String, required: true },
+    },
 
-  // Финансовая информация
-  totalAmount: {
-    type: Number,
-    required: true,
+    status: {
+      type: String,
+      enum: ['new', 'processing', 'shipped', 'delivered', 'cancelled'],
+      default: 'new',
+    },
+
+    paymentMethod: {
+      type: String,
+      default: 'cash_on_delivery',
+    },
   },
-  
-  // Данные для доставки (могут отличаться от профиля)
-  shippingAddress: {
-    fullName: { type: String, required: true },
-    phone: { type: String, required: true },
-    address: { type: String, required: true },
-    city: { type: String, default: 'Душанбе' },
-    comments: { type: String }, // Комментарий курьеру
-  },
+  { timestamps: true }
+);
 
-  // Статус заказа
-  status: {
-    type: String,
-    enum: ['new', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'],
-    default: 'new',
-    index: true, // Для быстрой фильтрации админом
-  },
-
-  // Способ оплаты
-  paymentMethod: {
-    type: String,
-    enum: ['cash_on_delivery', 'card_online'], // Наличные или карта
-    default: 'cash_on_delivery',
-  },
-
-  // История изменений статуса (Pro feature)
-  // Позволяет видеть: "Заказ создан 10:00", "Принят 10:05", "Доставлен 12:00"
-  statusHistory: [
-    {
-      status: { type: String, required: true },
-      changedAt: { type: Date, default: Date.now },
-      comment: { type: String },
-    }
-  ],
-
-}, { 
-  timestamps: true // Автоматические поля createdAt и updatedAt
-});
-
-// Middleware: Авто-генерация номера заказа перед сохранением
-// (Простая реализация инкремента. В high-load проектах используют отдельные счетчики)
-OrderSchema.pre('save', async function(next) {
+// Генерация красивого номера заказа
+OrderSchema.pre('save', function(next) {
   if (!this.orderNumber) {
-    const lastOrder = await this.constructor.findOne({}, {}, { sort: { 'orderNumber': -1 } });
-    this.orderNumber = lastOrder && lastOrder.orderNumber ? lastOrder.orderNumber + 1 : 10001;
+    const date = new Date();
+    // Пример: ORD-1205-5839 (ДеньМесяц-СлучайноеЧисло)
+    const random = Math.floor(1000 + Math.random() * 9000);
+    this.orderNumber = `ORD-${date.getDate()}${date.getMonth()+1}-${random}`;
   }
   next();
 });

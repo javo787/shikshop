@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectMongoDB } from '@/lib/mongodb';
 import Order from '@/models/Order';
-import { sendTelegramNotification } from '@/lib/telegram'; // <--- 1. Импортируем
-
-// ... (метод GET оставляем без изменений)
+import { sendTelegramNotification } from '@/lib/telegram'; // Если вы уже создали этот файл
 
 export async function POST(req) {
   try {
@@ -14,7 +12,7 @@ export async function POST(req) {
 
     // Создаем заказ
     const newOrder = await Order.create({
-      user: userId || 'Guest',
+      user: userId || 'Guest', // Теперь модель это примет
       items: items.map(item => ({
         product: item._id,
         name: item.name,
@@ -24,16 +22,22 @@ export async function POST(req) {
         size: item.selectedSize || ''
       })),
       totalAmount,
-      shippingAddress,
+      shippingAddress: {
+          name: shippingAddress.name, // Убедитесь, что имена полей совпадают
+          phone: shippingAddress.phone,
+          address: shippingAddress.address
+      },
       paymentMethod: paymentMethod || 'cash_on_delivery',
       status: 'new'
     });
 
-    // 2. ОТПРАВЛЯЕМ В ТЕЛЕГРАМ (внутри try-catch, чтобы не ломать заказ, если телеграм зависнет)
+    // Попытка отправить уведомление в Telegram (не блокирует создание заказа при ошибке)
     try {
-      await sendTelegramNotification(newOrder);
+        if (typeof sendTelegramNotification === 'function') {
+            await sendTelegramNotification(newOrder);
+        }
     } catch (tgError) {
-      console.error('Не удалось отправить в Telegram:', tgError);
+        console.error('Ошибка Telegram:', tgError);
     }
 
     return NextResponse.json(
@@ -42,41 +46,31 @@ export async function POST(req) {
     );
 
   } catch (error) {
-    console.error('Order API Error:', error);
-    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
+    console.error('Order API Error:', error); // Эту ошибку вы видели в логах
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// Получение всех заказов (для админки)
+// Метод GET для админки
 export async function GET(req) {
   try {
     await connectMongoDB();
-    // Сортируем: сначала новые
     const orders = await Order.find().sort({ createdAt: -1 });
     return NextResponse.json(orders);
   } catch (error) {
-    console.error('Order Fetch Error:', error);
     return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
   }
 }
 
-// Обновление статуса заказа
+// Метод PUT для обновления статуса
 export async function PUT(req) {
   try {
     const body = await req.json();
     const { id, status } = body;
-
     await connectMongoDB();
-
-    const updatedOrder = await Order.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    );
-
+    const updatedOrder = await Order.findByIdAndUpdate(id, { status }, { new: true });
     return NextResponse.json(updatedOrder);
   } catch (error) {
-    console.error('Order Update Error:', error);
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
   }
 }
