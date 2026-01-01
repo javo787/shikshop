@@ -6,7 +6,8 @@ import ClientImage from './ClientImage';
 import { auth } from '@/lib/firebase'; // Импортируем Auth
 
 // --- КОНСТАНТЫ ---
-const MAX_FILE_SIZE_MB = 10;
+// Разрешаем выбирать большие файлы (до 30МБ), так как мы их все равно сожмем
+const MAX_INPUT_SIZE_MB = 30; 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
 const LOGO_PATH = '/images/logo.png'; 
 
@@ -36,7 +37,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
   
   const fileInputRef = useRef(null);
 
-  // 1. Следим за авторизацией и сбрасываем при закрытии
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => {
       setUser(u);
@@ -51,13 +51,57 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
         setWarning(null);
         setLoading(false);
         setIsDragging(false);
-        setIsLimitReached(false); // Сброс блокировки
+        setIsLimitReached(false);
       }, 300);
     }
     return () => unsubscribe();
   }, [isOpen]);
 
-  // Наложение логотипа (Ваша функция)
+  // --- ФУНКЦИЯ СЖАТИЯ ИЗОБРАЖЕНИЯ ---
+  const compressImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          
+          // Максимальная сторона - 1280px (достаточно для качественной примерки)
+          const MAX_SIZE = 1280; 
+          let width = img.width;
+          let height = img.height;
+
+          // Логика ресайза с сохранением пропорций
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Сжимаем в JPEG с качеством 0.8 (значительно уменьшает вес)
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
   const applyBranding = async (imageUrl) => {
     return new Promise((resolve) => {
       const img = new window.Image();
@@ -87,20 +131,31 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
     });
   };
 
-  const processFile = (file) => {
+  // --- ОБРАБОТКА ФАЙЛА С АВТО-СЖАТИЕМ ---
+  const processFile = async (file) => {
     setError(null);
     if (!file) return;
+    
     if (!ALLOWED_TYPES.includes(file.type)) {
       setError('Поддерживаются только форматы JPG, PNG и WEBP.');
       return;
     }
-    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-      setError(`Файл слишком большой. Максимум ${MAX_FILE_SIZE_MB} МБ.`);
+
+    // Проверяем входной размер (на всякий случай, чтобы браузер не завис от 100МБ файла)
+    if (file.size > MAX_INPUT_SIZE_MB * 1024 * 1024) {
+      setError(`Файл слишком большой. Максимум ${MAX_INPUT_SIZE_MB} МБ.`);
       return;
     }
-    const reader = new FileReader();
-    reader.onloadend = () => setPersonImage(reader.result);
-    reader.readAsDataURL(file);
+
+    try {
+        // Если файл больше 2МБ, сжимаем его. Если меньше - оставляем как есть или тоже нормализуем.
+        // Лучше прогонять через сжатие всегда, чтобы гарантировать формат и размер для API.
+        const compressedImage = await compressImage(file);
+        setPersonImage(compressedImage);
+    } catch (err) {
+        console.error("Ошибка сжатия:", err);
+        setError("Не удалось обработать изображение. Попробуйте другое.");
+    }
   };
 
   const handleFileChange = (e) => processFile(e.target.files[0]);
@@ -123,25 +178,23 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
     setStep('processing');
 
     try {
-      // 1. ЗАПУСК ГЕНЕРАЦИИ (Отправляем userId для проверки лимитов)
       const startResponse = await fetch('/api/try-on', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           personImage, 
           garmentImage,
-          userId: user?.uid || null // Передаем ID
+          userId: user?.uid || null 
         }),
       });
 
       const startData = await startResponse.json();
 
       if (!startResponse.ok) {
-        // ОБРАБОТКА ОШИБОК ЛИМИТОВ
         if (startData.error === 'LIMIT_REACHED_GUEST') {
           setError('Гостевой лимит исчерпан! Зарегистрируйтесь, чтобы получить 3 попытки.');
           setIsLimitReached(true);
-          setStep('upload'); // Возвращаем на экран загрузки, чтобы показать ошибку
+          setStep('upload'); 
           setLoading(false);
           return;
         } 
@@ -159,7 +212,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
       
       if (prediction.warning) setWarning(prediction.warning);
 
-      // 2. ЦИКЛ ПРОВЕРКИ (POLLING)
       while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
         await new Promise((resolve) => setTimeout(resolve, 3000));
         const checkResponse = await fetch(`/api/try-on?id=${prediction.id}`);
@@ -168,7 +220,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
         }
       }
 
-      // 3. РЕЗУЛЬТАТ
       if (prediction.status === 'failed') {
         throw new Error("Нейросеть не справилась с фото. Попробуйте другое, более четкое фото.");
       }
@@ -176,7 +227,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
       let finalUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
       const brandedImage = await applyBranding(finalUrl);
 
-      // Обновляем остаток попыток, если сервер вернул его
       if (prediction.remaining !== undefined) {
         setRemainingTries(prediction.remaining);
       }
@@ -233,7 +283,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
         <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600 mb-2 drop-shadow-sm">{compliment}</h2>
         <p className="text-gray-500 text-sm">Готово! Образ сохранен в высоком качестве.</p>
         
-        {/* Показываем остаток попыток */}
         {remainingTries !== null && (
           <p className="text-xs text-gray-400 mt-1">Осталось попыток: <b>{remainingTries}</b></p>
         )}
@@ -263,7 +312,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
       <div className="flex flex-col gap-4 group h-full">
         <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">1</span> Ваше фото</p>
         
-        {/* Инфо-блок о лимитах */}
         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300 flex gap-2 items-start">
             <span className="text-lg">ℹ️</span>
             <div>
@@ -335,8 +383,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
             </div>
           )}
         </div>
-        {step === 'upload' && (
-          <div className="p-5 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-4 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm">
+        {step === 'upload' &&    <div className="p-5 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-4 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <button onClick={onClose} className="px-6 py-3 text-gray-500 hover:text-gray-800 font-medium transition-colors rounded-xl hover:bg-gray-100 dark:hover:text-white dark:hover:bg-gray-700">Отмена</button>
             <button 
               onClick={handleTryOn} 
@@ -349,7 +396,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
               {loading ? <>Обработка...</> : <>✨ Примерить</>}
             </button>
           </div>
-        )}
+       )}
       </div>
     </div>
   );
