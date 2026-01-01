@@ -18,14 +18,21 @@ export async function POST(req) {
 
     // А) Если пользователь зарегистрирован (userId пришел с фронта)
     if (userId) {
-      const user = await User.findById(userId);
+      // ⚠️ ИСПРАВЛЕНИЕ: Ищем по firebaseUid, а не по _id
+      const user = await User.findOne({ firebaseUid: userId });
       
-      if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      // Если юзер не найден в БД (например, регистрация не прошла до конца), считаем его гостем
+      if (!user) {
+         // Можно либо выдать ошибку, либо пустить по логике гостя. 
+         // Для безопасности лучше выдать ошибку, чтобы синхронизация починилась.
+         return NextResponse.json({ error: 'User profile not found. Try re-login.' }, { status: 404 });
+      }
+
       if (user.isBlocked) return NextResponse.json({ error: 'Ваш аккаунт заблокирован' }, { status: 403 });
 
       if (user.tryOnBalance <= 0) {
-        // Логируем попытку как заблокированную
-        await TryOnLog.create({ userId, ipAddress: ip, status: 'blocked', userAgent });
+        // Логируем попытку как заблокированную (используем user._id для связи, так как он найден)
+        await TryOnLog.create({ userId: user._id, ipAddress: ip, status: 'blocked', userAgent });
         return NextResponse.json({ 
           error: 'LIMIT_REACHED_BUY', 
           message: 'Лимит исчерпан. Оформите заказ, чтобы получить 30 попыток!' 
@@ -37,7 +44,7 @@ export async function POST(req) {
       await user.save();
       
       // Логируем успешный запуск
-      await TryOnLog.create({ userId, ipAddress: ip, status: 'success', userAgent });
+      await TryOnLog.create({ userId: user._id, ipAddress: ip, status: 'success', userAgent });
     } 
     
     // Б) Если это гость (без регистрации)
@@ -87,7 +94,8 @@ export async function POST(req) {
     // Получаем актуальный баланс для возврата на фронтенд
     let remaining = 0;
     if (userId) {
-       const updatedUser = await User.findById(userId);
+       // ⚠️ И здесь тоже ищем по firebaseUid
+       const updatedUser = await User.findOne({ firebaseUid: userId });
        remaining = updatedUser ? updatedUser.tryOnBalance : 0;
     }
 
@@ -104,6 +112,7 @@ export async function POST(req) {
   }
 }
 
+// GET остается без изменений, он работает с ID Replicate, а не пользователей
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
