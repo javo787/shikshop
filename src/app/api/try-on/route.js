@@ -4,34 +4,35 @@ import { connectMongoDB } from '@/lib/mongodb';
 import User from '@/models/User';
 import TryOnLog from '@/models/TryOnLog';
 
+// Отключаем кэширование, чтобы каждый запрос был новым
 export const dynamic = 'force-dynamic';
 
 export async function POST(req) {
   try {
     const { personImage, garmentImage, userId } = await req.json();
 
-    // --- 1. ЛОГИКА ПРОВЕРКИ ЛИМИТОВ ---
+    // --- 1. ПРОВЕРКА ЛИМИТОВ И БЕЗОПАСНОСТЬ ---
     const ip = req.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = req.headers.get('user-agent') || 'unknown';
 
+    if (!personImage || !garmentImage) {
+      return NextResponse.json({ error: "Не загружены фото" }, { status: 400 });
+    }
+
     await connectMongoDB();
 
-    // А) Если пользователь зарегистрирован (userId пришел с фронта)
+    // А) Логика для зарегистрированных
     if (userId) {
-      // ⚠️ ИСПРАВЛЕНИЕ: Ищем по firebaseUid, а не по _id
+      // Ищем по firebaseUid
       const user = await User.findOne({ firebaseUid: userId });
       
-      // Если юзер не найден в БД (например, регистрация не прошла до конца), считаем его гостем
       if (!user) {
-         // Можно либо выдать ошибку, либо пустить по логике гостя. 
-         // Для безопасности лучше выдать ошибку, чтобы синхронизация починилась.
          return NextResponse.json({ error: 'User profile not found. Try re-login.' }, { status: 404 });
       }
 
       if (user.isBlocked) return NextResponse.json({ error: 'Ваш аккаунт заблокирован' }, { status: 403 });
 
       if (user.tryOnBalance <= 0) {
-        // Логируем попытку как заблокированную (используем user._id для связи, так как он найден)
         await TryOnLog.create({ userId: user._id, ipAddress: ip, status: 'blocked', userAgent });
         return NextResponse.json({ 
           error: 'LIMIT_REACHED_BUY', 
@@ -39,70 +40,79 @@ export async function POST(req) {
         }, { status: 403 });
       }
 
-      // Списываем 1 попытку
+      // Списываем баланс
       user.tryOnBalance -= 1;
       await user.save();
       
-      // Логируем успешный запуск
       await TryOnLog.create({ userId: user._id, ipAddress: ip, status: 'success', userAgent });
     } 
-    
-    // Б) Если это гость (без регистрации)
+    // Б) Логика для гостей
     else {
-      // Проверяем, сколько раз этот IP использовал функцию без входа
       const usageCount = await TryOnLog.countDocuments({ 
         ipAddress: ip, 
         userId: null, 
         status: 'success'
       });
 
-      if (usageCount >= 1) { // Лимит для гостей = 1
+      if (usageCount >= 1) { 
         return NextResponse.json({ 
           error: 'LIMIT_REACHED_GUEST', 
-          message: 'Бесплатная попытка использована. Зарегистрируйтесь, чтобы получить еще 3!' 
+          message: 'Гостевой лимит исчерпан.' 
         }, { status: 403 });
       }
 
-      // Логируем использование гостем
       await TryOnLog.create({ userId: null, ipAddress: ip, status: 'success', userAgent });
     }
 
-    // --- 2. ЗАПУСК НЕЙРОСЕТИ (REPLICATE) ---
+    // --- 2. НАСТРОЙКА НЕЙРОСЕТИ (PRO РЕЖИМ) ---
     const replicate = new Replicate({
       auth: process.env.REPLICATE_API_TOKEN,
     });
 
-    if (!personImage || !garmentImage) {
-      return NextResponse.json({ error: "Нет фото" }, { status: 400 });
-    }
+    // Генерация случайного зерна (Seed), чтобы при повторной попытке результат менялся
+    const randomSeed = Math.floor(Math.random() * 2147483647);
+
+    // Магический промпт для улучшения качества
+    // Мы не можем использовать negative_prompt в этой версии модели, 
+    // поэтому вкладываем всё качество в описание.
+    const PRO_PROMPT = "high quality realistic clothing, detailed fabric texture, professional fashion photography, 4k uhd, natural lighting, high fidelity, best quality, award winning photo, 8k, highly detailed face";
 
     const prediction = await replicate.predictions.create({
+      // IDM-VTON (Актуальная версия)
       version: "0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
       input: {
-        crop: true, // ✅ ВКЛЮЧЕНО: Автоматическая обрезка
-        seed: 42,
-        steps: 30,
+        // Увеличиваем шаги для максимальной прорисовки (было 20-30)
+        steps: 40, 
+        
+        // Автоматическая обрезка под формат
+        crop: true, 
+        
+        // Случайный сид дает шанс исправить ошибки при повторе
+        seed: randomSeed, 
+        
+        // Лучшая категория для платьев и кофт
         category: "upper_body",
+        
         force_dc: false,
+        
+        // Картинки
         garm_img: garmentImage,
         human_img: personImage,
-        mask_only: false,
-        garment_des: "clothing",
+        
+        // Описание (Промпт)
+        garment_des: PRO_PROMPT,
       }
     });
 
-    // Получаем актуальный баланс для возврата на фронтенд
+    // Получаем остаток попыток для обновления интерфейса
     let remaining = 0;
     if (userId) {
-       // ⚠️ И здесь тоже ищем по firebaseUid
        const updatedUser = await User.findOne({ firebaseUid: userId });
        remaining = updatedUser ? updatedUser.tryOnBalance : 0;
     }
 
-    // Возвращаем ID задачи, предупреждение и оставшиеся попытки
     return NextResponse.json({
       ...prediction,
-      warning: "Загруженное изображение не в формате 3:4. Система автоматически обрезала его.",
       remaining: remaining
     });
 
@@ -112,7 +122,7 @@ export async function POST(req) {
   }
 }
 
-// GET остается без изменений, он работает с ID Replicate, а не пользователей
+// GET метод для проверки статуса (Polling)
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
