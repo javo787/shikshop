@@ -5,7 +5,7 @@ import User from '@/models/User';
 import { sendTelegramNotification } from '@/lib/telegram';
 import nodemailer from 'nodemailer'; 
 
-// --- НАСТРОЙКА ПОЧТЫ ---
+// --- НАСТРОЙКА ПОЧТЫ (GMAIL) ---
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -14,6 +14,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// --- СОЗДАНИЕ ЗАКАЗА (POST) ---
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -21,7 +22,7 @@ export async function POST(req) {
 
     await connectMongoDB();
 
-    // 1. Создаем заказ
+    // 1. Создаем заказ в базе
     const newOrder = await Order.create({
       user: userId || 'Guest',
       items: items.map(item => ({
@@ -42,24 +43,19 @@ export async function POST(req) {
       status: 'new'
     });
 
-    // 2. 📧 УМНАЯ ОТПРАВКА ПИСЬМА 📧
+    // 2. ОТПРАВКА EMAIL КЛИЕНТУ
     try {
       let targetEmail = userEmail;
 
-      // Если email не пришел с фронта, но юзер авторизован — ищем email в базе
+      // Если email не пришел с фронта, но юзер авторизован — ищем email в базе молча
       if (!targetEmail && userId && userId !== 'Guest') {
-         console.log(`🔍 Ищу email для пользователя ${userId}...`);
-         // Пробуем найти по firebaseUid или по _id
          const user = await User.findOne({ firebaseUid: userId }) || await User.findById(userId).catch(() => null);
          if (user && user.email) {
             targetEmail = user.email;
-            console.log(`✅ Нашел email в базе: ${targetEmail}`);
          }
       }
 
       if (targetEmail) {
-        console.log(`📤 Пытаюсь отправить письмо на: ${targetEmail}`);
-        
         await transporter.sendMail({
           from: '"PARIZOD Shop" <' + process.env.GMAIL_USER + '>',
           to: targetEmail, 
@@ -100,6 +96,7 @@ export async function POST(req) {
                 <div style="margin-bottom: 30px; padding-left: 15px; border-left: 4px solid #ec4899;">
                    <p style="color: #4b5563; margin: 5px 0;">Адрес: ${shippingAddress.address}</p>
                    <p style="color: #4b5563; margin: 5px 0;">Телефон: <strong>${shippingAddress.phone}</strong></p>
+                   <p style="color: #4b5563; margin: 5px 0;">Оплата: ${paymentMethod === 'cash_on_delivery' ? 'При получении' : 'Картой'}</p>
                 </div>
 
                 <div style="text-align: center; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
@@ -109,13 +106,12 @@ export async function POST(req) {
             </div>
           `
         });
-        console.log('✅ Письмо успешно отправлено!');
-      } else {
-        console.warn('⚠️ Письмо НЕ отправлено: Email получателя не найден ни в запросе, ни в базе.');
-      }
-
+        // Оставляем только этот лог успеха
+        console.log(`✅ Email отправлен на: ${targetEmail}`);
+      } 
     } catch (emailError) {
-      console.error('❌ Ошибка отправки Email (Nodemailer):', emailError);
+      // Лог ошибки оставляем обязательно!
+      console.error('❌ Ошибка отправки Email:', emailError);
     }
 
     // 3. Отправка в Telegram
@@ -134,7 +130,7 @@ export async function POST(req) {
   }
 }
 
-// ... GET и PUT оставляем без изменений ...
+// --- GET ORDERS ---
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -149,6 +145,7 @@ export async function GET(req) {
   }
 }
 
+// --- UPDATE STATUS (PUT) ---
 export async function PUT(req) {
   try {
     const body = await req.json();

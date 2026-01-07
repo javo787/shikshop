@@ -7,7 +7,7 @@ import Footer from '@/components/Footer';
 import NewUserPrompt from '@/components/NewUserPrompt';
 import AOSInitializer from '@/components/AOSInitializer';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
-import { FavoritesProvider } from '@/context/FavoritesContext'; // <--- 1. Импорт Context
+import { FavoritesProvider } from '@/context/FavoritesContext'; 
 import { CartProvider } from '@/context/CartContext';
 import '@/styles/globals.css';
 
@@ -24,6 +24,26 @@ const playfair = Playfair_Display({
   display: 'swap',
 });
 
+// 🔥 SEO НАСТРОЙКИ (Ваша верификация здесь)
+export const metadata = {
+  title: {
+    default: 'PARIZOD | Магазин стильной одежды',
+    template: '%s | PARIZOD'
+  },
+  description: 'Интернет-магазин модной женской одежды в Таджикистане. Платья, пальто, хиджабы и аксессуары с виртуальной примеркой.',
+  verification: {
+    // 👇 ВОТ ВАШ КОД ПОДТВЕРЖДЕНИЯ
+    google: 'QJDsSEZ4Hj4ZwbJvsJzzARfXSf9CeQIDhvOhaKDBUuo',
+  },
+  openGraph: {
+    title: 'PARIZOD',
+    description: 'Стильная одежда с доставкой и примеркой.',
+    type: 'website',
+    locale: 'ru_TJ',
+    siteName: 'PARIZOD Shop',
+  },
+};
+
 export default async function RootLayout({ children }) {
   const cookieStore = await cookies();
   const locale = cookieStore.get('my_shikshop_locale')?.value || 'ru';
@@ -36,30 +56,30 @@ export default async function RootLayout({ children }) {
     messages = (await import(`../../messages/ru.json`)).default;
   }
 
-
   return (
     <html lang={locale} className={`${inter.variable} ${playfair.variable} dark`}>
       <head>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" />
       </head>
       <body className="bg-bg-light dark:bg-dark-teal font-sans flex flex-col min-h-screen">
+        {/* Google Analytics */}
         <GoogleAnalytics GA_MEASUREMENT_ID="G-QGF9MP9P5S" />
 
-      <NextIntlClientProvider locale={locale} messages={messages}>
-        <CartProvider>
-          <FavoritesProvider> {/* <--- 2. Оборачиваем весь сайт */}
-            <Header locale={locale} />
-            
-            <main className="flex-grow">{children}</main>
-            
-            <Footer />
-            
-            <NewUserPrompt />
-            
-            <AOSInitializer />
-         </FavoritesProvider>
-         </CartProvider>
-       </NextIntlClientProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <CartProvider>
+            <FavoritesProvider>
+              <Header locale={locale} />
+              
+              <main className="flex-grow">{children}</main>
+              
+              <Footer />
+              
+              <NewUserPrompt />
+              
+              <AOSInitializer />
+            </FavoritesProvider>
+          </CartProvider>
+        </NextIntlClientProvider>
         
         <Script
           src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"
