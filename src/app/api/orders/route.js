@@ -3,27 +3,25 @@ import { connectMongoDB } from '@/lib/mongodb';
 import Order from '@/models/Order';
 import User from '@/models/User'; 
 import { sendTelegramNotification } from '@/lib/telegram';
-import nodemailer from 'nodemailer'; // 1. Импортируем Nodemailer
+import nodemailer from 'nodemailer'; 
 
-// 2. Настройка транспортера Gmail
+// --- НАСТРОЙКА ПОЧТЫ ---
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.GMAIL_USER, // parizod.tj@gmail.com
-    pass: process.env.GMAIL_PASS, // Ваш 16-значный код
+    user: process.env.GMAIL_USER, 
+    pass: process.env.GMAIL_PASS, 
   },
 });
 
-// --- CREATE ORDER (POST) ---
 export async function POST(req) {
   try {
     const body = await req.json();
-    // Добавил userEmail в извлекаемые данные
     const { items, totalAmount, shippingAddress, paymentMethod, userId, userEmail } = body;
 
     await connectMongoDB();
 
-    // 1. Создаем заказ в базе
+    // 1. Создаем заказ
     const newOrder = await Order.create({
       user: userId || 'Guest',
       items: items.map(item => ({
@@ -44,28 +42,39 @@ export async function POST(req) {
       status: 'new'
     });
 
-    // 2. Логика отправки Email (Профессиональный шаблон) 📧
+    // 2. 📧 УМНАЯ ОТПРАВКА ПИСЬМА 📧
     try {
-      // Если email не пришел с фронта, не отправляем (чтобы не было ошибки), или отправляем админу
-      if (userEmail) {
-        await transporter.sendMail({
-          from: '"PARIZOD Shop" <' + process.env.GMAIL_USER + '>', // Красивое имя отправителя
-          to: userEmail, 
-          subject: `✨ Заказ #${newOrder.orderNumber || 'принят'} | PARIZOD`,
-          html: `
-            <div style="background-color: #f8f9fa; padding: 40px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-              <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
-                
-                <div style="text-align: center; margin-bottom: 30px;">
-                  <h1 style="color: #ec4899; margin: 0; font-size: 28px; letter-spacing: -1px;">PARIZOD</h1>
-                  <p style="color: #6b7280; margin-top: 5px; font-size: 14px;">Магазин стильной одежды</p>
-                </div>
+      let targetEmail = userEmail;
 
+      // Если email не пришел с фронта, но юзер авторизован — ищем email в базе
+      if (!targetEmail && userId && userId !== 'Guest') {
+         console.log(`🔍 Ищу email для пользователя ${userId}...`);
+         // Пробуем найти по firebaseUid или по _id
+         const user = await User.findOne({ firebaseUid: userId }) || await User.findById(userId).catch(() => null);
+         if (user && user.email) {
+            targetEmail = user.email;
+            console.log(`✅ Нашел email в базе: ${targetEmail}`);
+         }
+      }
+
+      if (targetEmail) {
+        console.log(`📤 Пытаюсь отправить письмо на: ${targetEmail}`);
+        
+        await transporter.sendMail({
+          from: '"PARIZOD Shop" <' + process.env.GMAIL_USER + '>',
+          to: targetEmail, 
+          subject: `✨ Заказ #${newOrder.orderNumber || newOrder._id.toString().slice(-6)} принят!`,
+          html: `
+            <div style="background-color: #f8f9fa; padding: 40px 0; font-family: sans-serif;">
+              <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+                <div style="text-align: center; margin-bottom: 30px;">
+                  <h1 style="color: #ec4899; margin: 0; font-size: 28px;">PARIZOD</h1>
+                </div>
                 <h2 style="color: #111827; font-size: 20px; margin-bottom: 20px; text-align: center;">
                   Спасибо за заказ, ${shippingAddress.name}! 💖
                 </h2>
-                <p style="color: #374151; font-size: 16px; line-height: 1.5; text-align: center; margin-bottom: 30px;">
-                  Мы получили ваш заказ <strong>#${newOrder.orderNumber || newOrder._id.toString().slice(-6)}</strong> и уже начали его собирать.
+                <p style="color: #374151; font-size: 16px; text-align: center; margin-bottom: 30px;">
+                  Заказ <strong>#${newOrder.orderNumber || newOrder._id.toString().slice(-6)}</strong> принят в обработку.
                 </p>
 
                 <div style="background-color: #f3f4f6; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
@@ -74,43 +83,42 @@ export async function POST(req) {
                       <tr>
                         <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; color: #111827;">
                           <strong>${item.name}</strong> <br/>
-                          <span style="font-size: 12px; color: #6b7280;">Размер: ${item.selectedSize || 'One Size'} x ${item.quantity}</span>
+                          <span style="font-size: 12px; color: #6b7280;">${item.quantity} шт.</span>
                         </td>
-                        <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; text-align: right; color: #111827; font-weight: bold;">
+                        <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: bold;">
                           ${item.price * item.quantity} TJS
                         </td>
                       </tr>
                     `).join('')}
                     <tr>
-                      <td style="padding-top: 15px; font-size: 18px; font-weight: bold; color: #111827;">Итого:</td>
-                      <td style="padding-top: 15px; text-align: right; font-size: 18px; font-weight: bold; color: #ec4899;">${totalAmount} TJS</td>
+                      <td style="padding-top: 15px; font-weight: bold;">Итого:</td>
+                      <td style="padding-top: 15px; text-align: right; font-weight: bold; color: #ec4899;">${totalAmount} TJS</td>
                     </tr>
                   </table>
                 </div>
 
-                <div style="margin-bottom: 30px; border-left: 4px solid #ec4899; padding-left: 15px;">
-                  <h3 style="margin: 0 0 10px 0; color: #111827; font-size: 16px;">📍 Данные доставки:</h3>
-                  <p style="margin: 0; color: #4b5563; font-size: 14px;">Адрес: ${shippingAddress.address}</p>
-                  <p style="margin: 5px 0 0 0; color: #4b5563; font-size: 14px;">Телефон: <strong>${shippingAddress.phone}</strong></p>
-                  <p style="margin: 5px 0 0 0; color: #4b5563; font-size: 14px;">Оплата: ${paymentMethod === 'cash_on_delivery' ? 'Наличными при получении' : 'Картой'}</p>
+                <div style="margin-bottom: 30px; padding-left: 15px; border-left: 4px solid #ec4899;">
+                   <p style="color: #4b5563; margin: 5px 0;">Адрес: ${shippingAddress.address}</p>
+                   <p style="color: #4b5563; margin: 5px 0;">Телефон: <strong>${shippingAddress.phone}</strong></p>
                 </div>
 
-                <div style="text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px; color: #9ca3af; font-size: 12px;">
-                  <p>Если у вас есть вопросы, просто ответьте на это письмо.</p>
-                  <p>© 2026 PARIZOD. Все права защищены.</p>
+                <div style="text-align: center; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
+                  <p>© 2026 PARIZOD</p>
                 </div>
               </div>
             </div>
           `
         });
-        console.log('✅ Письмо успешно отправлено на', userEmail);
+        console.log('✅ Письмо успешно отправлено!');
+      } else {
+        console.warn('⚠️ Письмо НЕ отправлено: Email получателя не найден ни в запросе, ни в базе.');
       }
+
     } catch (emailError) {
-      console.error('❌ Ошибка отправки Email:', emailError);
-      // Не прерываем выполнение, заказ все равно создан
+      console.error('❌ Ошибка отправки Email (Nodemailer):', emailError);
     }
 
-    // 3. Отправка в Telegram (Ваш старый код)
+    // 3. Отправка в Telegram
     try {
         if (typeof sendTelegramNotification === 'function') {
             await sendTelegramNotification(newOrder);
@@ -121,24 +129,19 @@ export async function POST(req) {
 
     return NextResponse.json({ message: 'Order created', orderId: newOrder.orderNumber }, { status: 201 });
   } catch (error) {
-    console.error('Order API Error:', error);
+    console.error('GLOBAL Order API Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// --- GET ORDERS (Без изменений) ---
+// ... GET и PUT оставляем без изменений ...
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
-
     await connectMongoDB();
-    
     let query = {};
-    if (userId) {
-      query = { user: userId };
-    }
-
+    if (userId) query = { user: userId };
     const orders = await Order.find(query).sort({ createdAt: -1 });
     return NextResponse.json(orders);
   } catch (error) {
@@ -146,34 +149,24 @@ export async function GET(req) {
   }
 }
 
-// --- UPDATE STATUS (PUT) (Без изменений, ваша логика бонусов сохранена) ---
 export async function PUT(req) {
   try {
     const body = await req.json();
     const { id, status } = body; 
-    
     await connectMongoDB();
-    
     const updatedOrder = await Order.findByIdAndUpdate(id, { status }, { new: true });
+    if (!updatedOrder) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
 
-    if (!updatedOrder) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-    }
-
-    // 🔥 ЛОГИКА НАЧИСЛЕНИЯ БОНУСОВ
     if (status === 'delivered') {
        if (updatedOrder.user && updatedOrder.user !== 'Guest') {
           await User.findByIdAndUpdate(updatedOrder.user, {
              $inc: { tryOnBalance: 20 },
              hasPurchased: true 
           });
-          console.log(`Пользователю ${updatedOrder.user} начислено +20 попыток.`);
        }
     }
-
     return NextResponse.json(updatedOrder);
   } catch (error) {
-    console.error('Update Order Error:', error);
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
   }
 }
