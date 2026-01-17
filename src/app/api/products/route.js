@@ -40,6 +40,8 @@ export async function GET(request) {
         _id: p._id.toString(),
         image: fixImage(p.image),
         imageLarge: fixImage(p.imageLarge),
+        // ✨ ВАЖНО: Добавили поле для примерки
+        tryOnImage: fixImage(p.tryOnImage),
         additionalImages: p.additionalImages?.map(fixImage) || []
       };
     });
@@ -57,6 +59,8 @@ export async function POST(req) {
 
     const productData = await req.json();
 
+    // Создаем товар.
+    // Убедитесь, что модель Product (src/models/Product.js) содержит поля tryOnImage и aiCategory
     const newProduct = await Product.create(productData);
 
     return NextResponse.json(newProduct, { status: 201 });
