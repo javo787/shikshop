@@ -50,17 +50,11 @@ export async function GET(request) {
         // Обработка одиночных изображений
         image: fixImage(p.image),
         imageLarge: fixImage(p.imageLarge),
-<<<<<<< HEAD
         tryOnImage: fixImage(p.tryOnImage), // Поддержка старого поля
         
         // Обработка массивов (с проверкой на существование)
         tryOnImages: Array.isArray(p.tryOnImages) ? p.tryOnImages.map(fixImage) : [],
         additionalImages: Array.isArray(p.additionalImages) ? p.additionalImages.map(fixImage) : []
-=======
-        // ✨ ВАЖНО: Добавили поле для примерки
-        tryOnImage: fixImage(p.tryOnImage),
-        additionalImages: p.additionalImages?.map(fixImage) || []
->>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
       };
     });
 
@@ -78,12 +72,8 @@ export async function POST(req) {
     const productData = await req.json();
 
     // Создаем товар.
-<<<<<<< HEAD
     // Mongoose сам отфильтрует поля, которых нет в схеме,
     // но так как мы обновили src/models/Product.js, поле tryOnImages сохранится.
-=======
-    // Убедитесь, что модель Product (src/models/Product.js) содержит поля tryOnImage и aiCategory
->>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
     const newProduct = await Product.create(productData);
 
     return NextResponse.json(newProduct, { status: 201 });

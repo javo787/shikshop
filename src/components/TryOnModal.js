@@ -40,7 +40,7 @@ const LOADING_STEPS = [
   { text: "🚀 Почти готово, загружаем...", emoji: "🚀" }
 ];
 
-// --- МОДАЛЬНОЕ ОКНО ВАЛИДАЦИИ ФОТО ---
+// --- НОВЫЙ КОМПОНЕНТ: Модальное окно валидации фото ---
 function PhotoValidationModal({ isOpen, onClose, onConfirm, imageSrc, brightnessWarning }) {
   const [checkedItems, setCheckedItems] = useState({});
   const allChecked = VALIDATION_CHECKLIST.every(item => checkedItems[item.id]);
@@ -56,7 +56,7 @@ function PhotoValidationModal({ isOpen, onClose, onConfirm, imageSrc, brightness
   if (!isOpen || !imageSrc) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
       <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-slideUp border border-white/40 dark:border-gray-700 relative">
         <div className="p-5 border-b border-gray-100 dark:border-gray-800 text-center">
              <h3 className="text-xl font-bold text-gray-800 dark:text-white">📸 Проверка фото перед примеркой</h3>
@@ -64,7 +64,7 @@ function PhotoValidationModal({ isOpen, onClose, onConfirm, imageSrc, brightness
         </div>
 
         <div className="p-6 flex flex-col md:flex-row gap-6 overflow-y-auto max-h-[70vh]">
-            <div className="w-full md:w-1/2 aspect-[3/4] relative rounded-2xl overflow-hidden shadow-md bg-gray-100 flex-shrink-0">
+            <div className="w-full md:w-1/2 aspect-3/4 relative rounded-2xl overflow-hidden shadow-md bg-gray-100 shrink-0">
                 <Image src={imageSrc} alt="Preview" fill className="object-cover" unoptimized />
                  {brightnessWarning && (
                     <div className="absolute bottom-0 left-0 right-0 bg-red-500/90 text-white text-xs p-2 text-center font-bold backdrop-blur-sm">
@@ -83,7 +83,7 @@ function PhotoValidationModal({ isOpen, onClose, onConfirm, imageSrc, brightness
                 <div className="space-y-3">
                     {VALIDATION_CHECKLIST.map((item) => (
                         <label key={item.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer group ${checkedItems[item.id] ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700 hover:border-pink-300'}`}>
-                            <div className={`relative flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${checkedItems[item.id] ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 group-hover:border-pink-400'}`}>
+                            <div className={`relative shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${checkedItems[item.id] ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 group-hover:border-pink-400'}`}>
                                 {!checkedItems[item.id] && <span className="absolute inset-0 rounded-md bg-pink-400 opacity-20 animate-ping"></span>}
                                 {checkedItems[item.id] && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                             </div>
@@ -102,7 +102,7 @@ function PhotoValidationModal({ isOpen, onClose, onConfirm, imageSrc, brightness
                 disabled={!allChecked || !!brightnessWarning}
                 className={`px-8 py-3 rounded-xl text-white font-bold shadow-lg transition-all flex items-center gap-2
                     ${allChecked && !brightnessWarning
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:shadow-green-500/40 hover:-translate-y-0.5' 
+                        ? 'bg-linear-to-r from-green-500 to-emerald-600 hover:shadow-green-500/40 hover:-translate-y-0.5' 
                         : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-70'}`}
             >
                 Подтвердить и продолжить
@@ -114,8 +114,7 @@ function PhotoValidationModal({ isOpen, onClose, onConfirm, imageSrc, brightness
 }
 
 // --- ОСНОВНОЙ КОМПОНЕНТ ---
-// 🔥 Добавили garmentCategory
-export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCategory }) {
+export default function TryOnModal({ isOpen, onClose, garmentImage }) {
   const [personImage, setPersonImage] = useState(null);
   const [tempUploadedImage, setTempUploadedImage] = useState(null); 
   const [isValidationOpen, setIsValidationOpen] = useState(false);
@@ -128,6 +127,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
   const [compliment, setCompliment] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   
+  // Состояния для анимации загрузки
   const [loadingStepIndex, setLoadingStepIndex] = useState(0);
   const [progress, setProgress] = useState(0);
 
@@ -145,20 +145,24 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
     return () => unsubscribe();
   }, [isOpen]);
 
+  // Эффект для анимации текста и прогресс-бара во время загрузки
   useEffect(() => {
     let msgInterval;
     let progressInterval;
 
     if (loading && step === 'processing') {
+      // 1. Меняем сообщения каждые 4.5 секунды
       setLoadingStepIndex(0);
       msgInterval = setInterval(() => {
         setLoadingStepIndex((prev) => (prev + 1) % LOADING_STEPS.length);
       }, 4500);
 
+      // 2. Имитация прогресс-бара (доходит до 95% за 50 секунд)
       setProgress(0);
       progressInterval = setInterval(() => {
         setProgress((prev) => {
-            if (prev >= 95) return 95;
+            // Быстро в начале, медленно в конце
+            if (prev >= 95) return 95; // Замираем на 95%
             const increment = prev < 50 ? 1.5 : prev < 80 ? 0.5 : 0.1;
             return prev + increment;
         });
@@ -185,7 +189,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
     setProgress(0);
   };
 
-  // ✅ ПОЛНАЯ ЛОГИКА АНАЛИЗА ЯРКОСТИ
   const analyzeImageQuality = (imgElement) => {
     const canvas = document.createElement('canvas');
     canvas.width = imgElement.width;
@@ -205,7 +208,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
     return null;
   };
 
-  // ✅ ПОЛНАЯ ЛОГИКА СЖАТИЯ
   const compressAndAnalyzeImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -233,7 +235,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
     });
   };
 
-  // ✅ ПОЛНАЯ ЛОГИКА БРЕНДИРОВАНИЯ
   const applyBranding = async (imageUrl) => {
     return new Promise((resolve) => {
         const img = new window.Image(); img.crossOrigin = "Anonymous"; img.src = imageUrl;
@@ -286,18 +287,10 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
     setLoading(true); setError(null); setIsLimitReached(false); setStep('processing');
 
     try {
-      // 🔥 ВАЖНО: Отправляем категорию
-      const finalCategory = garmentCategory || 'upper_body'; 
-
       const startResponse = await fetch('/api/try-on', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            personImage, 
-            garmentImage, 
-            userId: user?.uid || null,
-            category: finalCategory // <--- Передаем в API
-        }),
+        body: JSON.stringify({ personImage, garmentImage, userId: user?.uid || null }),
       });
 
       const startData = await startResponse.json();
@@ -326,8 +319,8 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
 
       setCompliment(COMPLIMENTS[Math.floor(Math.random() * COMPLIMENTS.length)]);
       setGeneratedImage(brandedImage);
-      setProgress(100); 
-      await new Promise(r => setTimeout(r, 500)); 
+      setProgress(100); // Сразу завершаем прогресс
+      await new Promise(r => setTimeout(r, 500)); // Небольшая пауза чтобы увидеть 100%
       setStep('result');
 
     } catch (err) {
@@ -345,25 +338,49 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
 
   if (!isOpen) return null;
 
+  // --- НОВЫЙ RENDER PROCESSING ---
   const renderProcessing = () => {
     const currentStep = LOADING_STEPS[loadingStepIndex];
     return (
         <div className="flex flex-col items-center justify-center h-[400px] text-center animate-fadeIn w-full max-w-md mx-auto">
+          {/* Анимированный круг */}
           <div className="relative w-32 h-32 mb-8">
             <div className="absolute inset-0 border-8 border-gray-100 dark:border-gray-800 rounded-full"></div>
-            <div className="absolute inset-0 border-8 border-primary-pink rounded-full border-t-transparent animate-spin" style={{ animationDuration: '2s' }}></div>
-            <div className="absolute inset-0 flex items-center justify-center text-4xl animate-bounce-slow">{currentStep.emoji}</div>
+            <div 
+                className="absolute inset-0 border-8 border-primary-pink rounded-full border-t-transparent animate-spin"
+                style={{ animationDuration: '2s' }}
+            ></div>
+            {/* Эмодзи внутри круга */}
+            <div className="absolute inset-0 flex items-center justify-center text-4xl animate-bounce-slow">
+                {currentStep.emoji}
+            </div>
           </div>
+    
+          {/* Меняющийся текст */}
           <div className="h-16 flex items-center justify-center w-full px-4">
-              <h4 key={loadingStepIndex} className="text-xl font-bold text-gray-800 dark:text-white animate-slideUp leading-tight">{currentStep.text}</h4>
+              <h4 
+                key={loadingStepIndex} // Ключ заставляет React перерисовывать анимацию при смене текста
+                className="text-xl font-bold text-gray-800 dark:text-white animate-slideUp leading-tight"
+              >
+                {currentStep.text}
+              </h4>
           </div>
+          
+          {/* Прогресс-бар */}
           <div className="w-full mt-6 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden relative">
-              <div className="bg-gradient-to-r from-pink-500 to-purple-600 h-2.5 rounded-full transition-all duration-300 ease-out relative" style={{ width: `${Math.floor(progress)}%` }}>
+              <div 
+                className="bg-linear-to-r from-pink-500 to-purple-600 h-2.5 rounded-full transition-all duration-300 ease-out relative" 
+                style={{ width: `${Math.floor(progress)}%` }}
+              >
+                  {/* Блик на прогресс-баре */}
                   <div className="absolute inset-0 bg-white/30 w-full h-full animate-[shimmer_2s_infinite]"></div>
               </div>
           </div>
           <p className="text-xs text-gray-400 mt-2 font-mono">{Math.floor(progress)}%</p>
-          <p className="text-gray-400 text-sm mt-8 max-w-xs mx-auto opacity-70">Обычно это занимает около 40-60 секунд. Пожалуйста, не закрывайте окно.</p>
+    
+          <p className="text-gray-400 text-sm mt-8 max-w-xs mx-auto opacity-70">
+            Обычно это занимает около 40-60 секунд. Пожалуйста, не закрывайте окно.
+          </p>
         </div>
       );
   };
@@ -375,14 +392,14 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
         <p className="text-gray-500 text-sm">Готово!</p>
         {remainingTries !== null && <p className="text-xs text-gray-400 mt-1">Осталось попыток: <b>{remainingTries}</b></p>}
       </div>
-      <div className="relative w-full max-w-md aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl mb-8 group ring-4 ring-pink-50 dark:ring-gray-800 bg-gray-100">
+      <div className="relative w-full max-w-md aspect-3/4 rounded-2xl overflow-hidden shadow-2xl mb-8 group ring-4 ring-pink-50 dark:ring-gray-800 bg-gray-100">
         <img src={generatedImage} alt="Результат" className="w-full h-full object-cover"/>
       </div>
       <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-        <button onClick={handleDownload} className="flex-1 px-8 py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl font-bold shadow-lg hover:shadow-pink-500/50 hover:-translate-y-1 transition-all flex items-center justify-center gap-2">Скачать фото</button>
+        <button onClick={handleDownload} className="flex-1 px-8 py-4 bg-linear-to-r from-pink-600 to-purple-600 text-white rounded-xl font-bold shadow-lg hover:shadow-pink-500/50 hover:-translate-y-1 transition-all flex items-center justify-center gap-2">Скачать фото</button>
         <button onClick={resetAll} className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 text-gray-700 dark:text-white rounded-xl font-semibold hover:bg-gray-50 transition-colors">Ещё раз</button>
       </div>
-      <p className="text-[10px] text-gray-400 mt-6 text-center max-w-xs">Образ создан ИИ. Возможны незначительные артефакты.</p>
+      <p className="text-[10px] text-gray-400 mt-6 text-center max-w-xs">Образ создан ИИ. Возможны незначительные артефакты. Мы не сохраняем ваши фото.</p>
     </div>
   );
 
@@ -398,7 +415,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
             </div>
         </div>
 
-        <div className={`flex-1 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-4 min-h-[250px] relative overflow-hidden ${isDragging ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400'} ${loading ? 'opacity-50 pointer-events-none' : ''}`} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onClick={() => !personImage && !loading && fileInputRef.current?.click()}>
+        <div className={`flex-1 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center p-4 min-h-62.5 relative overflow-hidden ${isDragging ? 'border-pink-500 bg-pink-50' : 'border-gray-300 hover:border-pink-400'} ${loading ? 'opacity-50 pointer-events-none' : ''}`} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onClick={() => !personImage && !loading && fileInputRef.current?.click()}>
           {loading ? (
              <div className="text-pink-500 font-medium animate-pulse">Обработка фото...</div>
           ) : personImage ? (
@@ -418,26 +435,24 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
           )}
           <input type="file" ref={fileInputRef} onChange={handleFileChange} accept={ALLOWED_TYPES.join(',')} className="hidden" disabled={loading} />
         </div>
-      </div><div className="flex flex-col gap-4 h-full">
+      </div>
+
+      <div className="flex flex-col gap-4 h-full">
         <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">2</span> Одежда</p>
-        <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center justify-center p-4 min-h-[300px] relative">
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center justify-center p-4 min-h-75 relative">
           {garmentImage ? (<ClientImage src={garmentImage} alt="Одежда" fill className="object-contain p-4" />) : (<p className="text-gray-400">Нет фото</p>)}
-          
-          {/* 🔥 ИНДИКАТОР КАТЕГОРИИ */}
-          <div className="absolute top-3 right-3 bg-gray-100 text-gray-600 px-3 py-1 text-xs rounded-full font-bold shadow-sm border border-gray-200">
-             {garmentCategory === 'dresses' ? '👗 Платье' : garmentCategory === 'lower_body' ? '👖 Низ' : '👚 Верх'}
-          </div>
         </div>
       </div>
     </div>
   );
 
   return (
-    <><div className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn ${!isOpen ? 'hidden' : ''}`}>
+    <>
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn ${!isOpen ? 'hidden' : ''}`}>
         <div className="absolute inset-0" onClick={onClose}></div>
         <div className="relative bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh] z-10 border border-white/40 dark:border-gray-700">
           <div className="flex justify-between items-center p-5 border-b border-gray-100 dark:border-gray-800 bg-white/50 backdrop-blur-sm">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-3"><span className="text-2xl">✨</span> Виртуальная примерочная</h3>
+            <h3 className="text-2xl font-bold bg-linear-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-3"><span className="text-2xl">✨</span> Виртуальная примерочная</h3>
             <button onClick={onClose} className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-red-500 transition-all">✕</button>
           </div>
           
@@ -446,7 +461,8 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
             {step === 'result' && generatedImage && renderResult()}
             {step === 'upload' && renderUpload()}
             
-            {error && (<div className="mt-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl flex flex-col items-center gap-2 animate-shake">
+            {error && (
+              <div className="mt-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl flex flex-col items-center gap-2 animate-shake">
                 <span className="font-medium text-center">{error}</span>
                 {isLimitReached && ( !user ? <a href="/register" className="text-sm bg-red-600 text-white px-4 py-2 rounded-lg">Зарегистрироваться</a> : <button onClick={onClose} className="text-sm bg-dark-teal text-white px-4 py-2 rounded-lg">Вернуться к покупкам</button> )}
               </div>
@@ -460,7 +476,8 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
                 onClick={handleTryOn} 
                 disabled={!personImage || loading || isLimitReached} 
                 className={`px-8 py-3 rounded-xl text-white font-bold shadow-lg transition-all flex items-center gap-2 
-                  ${personImage && !loading && !isLimitReached? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:shadow-pink-500/40 hover:-translate-y-0.5' 
+                  ${personImage && !loading && !isLimitReached
+                    ? 'bg-linear-to-r from-pink-600 to-purple-600 hover:shadow-pink-500/40 hover:-translate-y-0.5' 
                     : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-70'}`}
               >
                 {loading ? <>Запуск...</> : <>✨ Примерить</>}
@@ -475,7 +492,8 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, garmentCateg
         onClose={() => setIsValidationOpen(false)}
         onConfirm={handleValidationConfirm}
         imageSrc={tempUploadedImage}
-        brightnessWarning={warning}/>
+        brightnessWarning={warning}
+      />
     </>
   );
 }
