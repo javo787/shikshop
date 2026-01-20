@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
-import { connectMongoDB } from '@/lib/mongodb'; // Используем правильный импорт через @
-import Product from '@/models/Product'; // Используем правильный импорт через @
+import { connectMongoDB } from '@/lib/mongodb';
+import Product from '@/models/Product';
 
-// 👇 Функция очистки изображений (точно такая же, как в products/route.js)
+// В Next.js 15/16 кэширование GET-запросов изменилось.
+// 'force-dynamic' гарантирует, что мы всегда получаем свежие данные из БД, а не кэш.
+export const dynamic = 'force-dynamic';
+
+// 👇 Утилита очистки путей изображений (унифицированная для всего проекта)
 const fixImage = (img) => {
   if (!img) return null;
   let clean = img.toString().trim();
@@ -22,26 +26,35 @@ export async function GET(req, { params }) {
   try {
     await connectMongoDB();
     
-    // В Next.js 15 params нужно ждать!
+    // 🔥 ВАЖНО для Next.js 16: params — это Promise, его нужно ждать!
     const { id } = await params; 
 
+    // Проверка валидности ID перед запросом в БД
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ error: 'Invalid product ID' }, { status: 400 });
     }
 
-    const product = await Product.findById(id).lean(); // .lean() ускоряет запрос
+    const product = await Product.findById(id).lean();
 
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
-    // Применяем ту же логику исправления картинок, что и в каталоге
+    // Формируем ответ, обрабатывая и старые, и новые поля (обратная совместимость)
     const enhancedProduct = {
       ...product,
       _id: product._id.toString(),
+      
+      // Стандартные изображения
       image: fixImage(product.image),
       imageLarge: fixImage(product.imageLarge),
-      additionalImages: product.additionalImages?.map(fixImage) || []
+      
+      // 🔥 AI поля: поддержка и старого одиночного поля, и нового массива
+      tryOnImage: fixImage(product.tryOnImage),
+      tryOnImages: Array.isArray(product.tryOnImages) ? product.tryOnImages.map(fixImage) : [],
+      
+      // Галерея
+      additionalImages: Array.isArray(product.additionalImages) ? product.additionalImages.map(fixImage) : []
     };
 
     return NextResponse.json(enhancedProduct);
@@ -55,7 +68,7 @@ export async function PUT(req, { params }) {
   try {
     await connectMongoDB();
     
-    // В Next.js 15 params нужно ждать!
+    // 🔥 Next.js 16: ждем params
     const { id } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -63,6 +76,8 @@ export async function PUT(req, { params }) {
     }
     
     const productData = await req.json();
+    
+    // Обновляем товар (Mongoose сам обработает новые поля схемы из productData)
     const updatedProduct = await Product.findByIdAndUpdate(id, productData, { new: true });
     
     if (!updatedProduct) {
@@ -80,7 +95,7 @@ export async function DELETE(req, { params }) {
   try {
     await connectMongoDB();
     
-    // В Next.js 15 params нужно ждать!
+    // 🔥 Next.js 16: ждем params
     const { id } = await params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
