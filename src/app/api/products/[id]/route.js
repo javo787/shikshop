@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+<<<<<<< HEAD
 import mongoose from 'mongoose';
 import { connectMongoDB } from '@/lib/mongodb';
 import Product from '@/models/Product';
@@ -11,20 +12,17 @@ export const dynamic = 'force-dynamic';
 const fixImage = (img) => {
   if (!img) return null;
   let clean = img.toString().trim();
+=======
+import { connectMongoDB } from '@/lib/mongodb';
+import Product from '@/models/Product';
 
-  if (clean.includes('/api/images/http')) {
-    clean = clean.replace('/api/images/', '');
-  }
+export const dynamic = 'force-dynamic';
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
 
-  if (clean.startsWith('http') || clean.startsWith('/')) {
-    return clean;
-  }
-  return `/api/images/${clean}`;
-};
-
-export async function GET(req, { params }) {
+export async function GET(request, { params }) {
   try {
     await connectMongoDB();
+<<<<<<< HEAD
     
     // 🔥 ВАЖНО для Next.js 16: params — это Promise, его нужно ждать!
     const { id } = await params; 
@@ -35,19 +33,37 @@ export async function GET(req, { params }) {
     }
 
     const product = await Product.findById(id).lean();
+=======
+    const { id } = params;
+
+    const product = await Product.findById(id);
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
 
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
+<<<<<<< HEAD
     // Формируем ответ, обрабатывая и старые, и новые поля (обратная совместимость)
+=======
+    const fixImage = (img) => {
+      if (!img) return null;
+      let clean = img.toString().trim();
+      if (clean.includes('/api/images/http')) clean = clean.replace('/api/images/', '');
+      if (clean.startsWith('http') || clean.startsWith('/')) return clean;
+      return `/api/images/${clean}`;
+    };
+
+    // Формируем ответ с новыми полями
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
     const enhancedProduct = {
-      ...product,
+      ...product.toObject(),
       _id: product._id.toString(),
       
       // Стандартные изображения
       image: fixImage(product.image),
       imageLarge: fixImage(product.imageLarge),
+<<<<<<< HEAD
       
       // 🔥 AI поля: поддержка и старого одиночного поля, и нового массива
       tryOnImage: fixImage(product.tryOnImage),
@@ -55,14 +71,21 @@ export async function GET(req, { params }) {
       
       // Галерея
       additionalImages: Array.isArray(product.additionalImages) ? product.additionalImages.map(fixImage) : []
+=======
+      // 🔥 ВАЖНО: Возвращаем tryOnImage
+      tryOnImage: fixImage(product.tryOnImage), 
+      // aiCategory вернется автоматически, т.к. это просто строка
+      additionalImages: product.additionalImages?.map(fixImage) || []
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
     };
 
     return NextResponse.json(enhancedProduct);
   } catch (error) {
-    console.error('Error fetching product:', error.message);
-    return NextResponse.json({ error: 'Failed to fetch product', details: error.message }, { status: 500 });
+    console.error("Error fetching product:", error);
+    return NextResponse.json({ error: 'Failed to fetch product' }, { status: 500 });
   }
 }
+<<<<<<< HEAD
 
 export async function PUT(req, { params }) {
   try {
@@ -114,3 +137,5 @@ export async function DELETE(req, { params }) {
     return NextResponse.json({ error: 'Failed to delete product', details: error.message }, { status: 500 });
   }
 }
+=======
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d

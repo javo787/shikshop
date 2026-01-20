@@ -1,6 +1,10 @@
 'use client';
 
+<<<<<<< HEAD
 import { useState, useEffect, useMemo } from 'react';
+=======
+import { useState, useEffect, useRef, useMemo } from 'react';
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -97,6 +101,11 @@ export default function ProductClient({ product, similarProducts, reviews }) {
     if (distance < -minSwipeDistance) setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
   };
 
+<<<<<<< HEAD
+=======
+  const handleOpenTryOn = () => setIsTryOnOpen(true);
+  
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
   const handleAuthAction = (actionCallback) => {
     if (!user) setShowAuthModal(true);
     else actionCallback();
@@ -115,6 +124,7 @@ export default function ProductClient({ product, similarProducts, reviews }) {
     router.push('/cart');
   };
 
+<<<<<<< HEAD
   // --- 🔥 ЛОГИКА ЗАПУСКА ПРИМЕРКИ ---
   const handleTryOnClick = () => {
     // Если вариантов больше одного (разные цвета), показываем выбор
@@ -133,6 +143,8 @@ export default function ProductClient({ product, similarProducts, reviews }) {
       setIsTryOnOpen(true);
   };
 
+=======
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
     if (!userName.trim() || !comment.trim()) return setReviewError('Заполните все поля');
@@ -152,10 +164,14 @@ export default function ProductClient({ product, similarProducts, reviews }) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f2424]">
+<<<<<<< HEAD
       {/* Подсказка для примерки */}
       <TryOnSuggestion onOpen={handleTryOnClick} />
       
       {/* Модалка авторизации */}
+=======
+      <TryOnSuggestion onOpen={handleOpenTryOn} />
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
       <AuthRequestModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
 
       {/* 🔥 МОДАЛКА ВЫБОРА ЦВЕТА (ПОЯВЛЯЕТСЯ ТОЛЬКО ЕСЛИ МНОГО ВАРИАНТОВ) */}
@@ -192,6 +208,7 @@ export default function ProductClient({ product, similarProducts, reviews }) {
 
         <div className="bg-white dark:bg-[#153030] rounded-3xl shadow-xl overflow-hidden">
           <div className="grid md:grid-cols-2 gap-0">
+<<<<<<< HEAD
             
             {/* --- ЛЕВАЯ КОЛОНКА: ФОТО + МИНИАТЮРЫ --- */}
             <div className="flex flex-col h-full bg-gray-50 dark:bg-black/20">
@@ -254,6 +271,44 @@ export default function ProductClient({ product, similarProducts, reviews }) {
             </div>
 
             {/* --- ПРАВАЯ КОЛОНКА: ИНФО --- */}
+=======
+            {/* ФОТО */}
+            <div className="relative bg-gray-100 dark:bg-black/20 h-[50vh] md:h-auto group">
+               <div 
+                 className="w-full h-full relative cursor-zoom-in"
+                 onClick={() => setIsFullScreen(true)}
+                 onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+               >
+                 <ClientImage 
+                   src={images[currentImageIndex]} 
+                   alt={product.name} 
+                   fill 
+                   className="object-contain md:object-cover transition-transform duration-700 group-hover:scale-105" 
+                   priority
+                 />
+                 {/* 🔥 БЕЙДЖИК, ЕСЛИ ЕСТЬ AI ФОТО */}
+                 {product.tryOnImage && (
+                    <div className="absolute top-4 left-4 bg-white/90 backdrop-blur text-pink-600 text-xs font-bold px-3 py-1 rounded-full shadow-sm flex items-center gap-1">
+                        ✨ AI Ready
+                    </div>
+                 )}
+               </div>
+               
+               {images.length > 1 && (
+                 <>
+                   <button onClick={(e) => {e.stopPropagation(); setCurrentImageIndex(p => p===0?images.length-1:p-1)}} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-black/50 p-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110"><Icon name="arrow-left" className="w-5 h-5"/></button>
+                   <button onClick={(e) => {e.stopPropagation(); setCurrentImageIndex(p => p===images.length-1?0:p+1)}} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 dark:bg-black/50 p-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110"><Icon name="arrow-right" className="w-5 h-5"/></button>
+                   <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+                     {images.map((_, idx) => (
+                       <div key={idx} className={`w-2 h-2 rounded-full transition-all ${idx === currentImageIndex ? 'bg-primary-pink w-6' : 'bg-white/50'}`} />
+                     ))}
+                   </div>
+                 </>
+               )}
+            </div>
+
+            {/* ИНФО */}
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
             <div className="p-6 md:p-10 flex flex-col justify-center">
               <div className="mb-2 flex items-center gap-2">
                  <span className="bg-primary-pink/20 text-dark-teal dark:text-primary-pink px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest">New Collection</span>
@@ -290,8 +345,13 @@ export default function ProductClient({ product, similarProducts, reviews }) {
                   </button>
                 </div>
 
+<<<<<<< HEAD
                 {/* 🔥 КНОПКА ПРИМЕРКИ С НОВОЙ ЛОГИКОЙ */}
                 <button onClick={handleTryOnClick} className="w-full py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-primary-pink shadow-lg hover:shadow-purple-500/30 transition-all hover:-translate-y-1 flex items-center justify-center gap-2 group">
+=======
+                {/* 🔥 ОБНОВЛЕННАЯ КНОПКА ПРИМЕРКИ */}
+                <button onClick={handleOpenTryOn} className="w-full py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-primary-pink shadow-lg hover:shadow-purple-500/30 transition-all hover:-translate-y-1 flex items-center justify-center gap-2 group">
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
                   <span className="text-xl group-hover:rotate-12 transition-transform">✨</span>
                   Примерить онлайн (AI)
                 </button>
@@ -345,11 +405,21 @@ export default function ProductClient({ product, similarProducts, reviews }) {
         </div>
       )}
       
+<<<<<<< HEAD
       {/* 🔥 Передаем конкретное выбранное изображение в модалку */}
       <TryOnModal 
         isOpen={isTryOnOpen} 
         onClose={() => setIsTryOnOpen(false)} 
         garmentImage={selectedTryOnImage} 
+=======
+      {/* 🔥 ОБНОВЛЕННЫЙ ВЫЗОВ МОДАЛКИ: Передаем категорию и спец. фото */}
+      <TryOnModal 
+        isOpen={isTryOnOpen} 
+        onClose={() => setIsTryOnOpen(false)} 
+        // 1. Приоритет: tryOnImage -> imageLarge -> image
+        garmentImage={product.tryOnImage || product.imageLarge || product.image} 
+        // 2. Категория для нейросети
+>>>>>>> 8d4ccfa01d12cb616eeaa127454ef95d9fd06c6d
         garmentCategory={product.aiCategory || 'upper_body'}
       />
     </div>
