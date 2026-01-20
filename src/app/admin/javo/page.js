@@ -42,10 +42,10 @@ export default function AdminProducts() {
   
   // --- STATE: Изображения ---
   const [image, setImage] = useState(''); // Главное (для каталога)
-  const [imageLarge, setImageLarge] = useState(''); // Большое (если отличается)
-  const [additionalImages, setAdditionalImages] = useState([]); // Галерея (массив)
+  const [imageLarge, setImageLarge] = useState(''); 
+  const [additionalImages, setAdditionalImages] = useState([]); 
   
-  // 🔥 STATE: AI Изображения (Массив вариантов/цветов)
+  // 🔥 STATE: AI Изображения
   const [tryOnImages, setTryOnImages] = useState([]); 
 
   // --- STATE: Системные ---
@@ -54,6 +54,9 @@ export default function AdminProducts() {
   const [success, setSuccess] = useState(null);
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
+  
+  // 🔥 STATE: Генерация AI
+  const [isGenerating, setIsGenerating] = useState(false);
   
   const router = useRouter();
 
@@ -79,7 +82,6 @@ export default function AdminProducts() {
       setProducts(data);
     } catch (err) {
       setError('Ошибка загрузки списка товаров');
-      console.error(err);
     }
   };
 
@@ -87,14 +89,12 @@ export default function AdminProducts() {
   const handleCategoryChange = (e) => {
     const selectedValue = e.target.value;
     setCategory(selectedValue);
-    // Автоматический выбор типа одежды для нейросети
     const found = CLOTHING_CATEGORIES.find(c => c.value === selectedValue);
     if (found) {
       setAiCategory(found.aiType);
     }
   };
 
-  // Хелперы для массивов изображений
   const addImageToArray = (url, setter) => {
     if (url) setter(prev => [...prev, url]);
   };
@@ -108,14 +108,85 @@ export default function AdminProducts() {
     return img.startsWith('http') ? img : `/api/images/${img}`;
   };
 
+  // 🔥 ФУНКЦИЯ ГЕНЕРАЦИИ ЧЕРЕЗ AI (GEMINI)
+  const handleGenerateAI = async () => {
+    if (!image) {
+        alert("Сначала загрузите главное фото (обложку)!");
+        return;
+    }
+
+    try {
+        setIsGenerating(true);
+        setError(null);
+
+        // 1. Конвертируем URL картинки в Base64
+        const imageUrl = getImageUrl(image);
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        
+        const base64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+        });
+
+        // 2. Собираем то, что вы уже написали в поля (контекст для AI)
+        const currentData = {
+            name,
+            description,
+            material,
+            details // если есть детали, тоже отправим
+        };
+
+        // 3. Отправляем в API
+        const res = await fetch('/api/admin/generate-product', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageBase64: base64, currentData }),
+        });
+
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || 'Ошибка генерации');
+        }
+        
+        const data = await res.json();
+
+        // 4. Заполняем поля ответом от AI
+        if (data.name) setName(data.name);
+        if (data.description) setDescription(data.description);
+        if (data.material) setMaterial(data.material);
+        if (data.details) setDetails(data.details);
+        
+        // Если AI уверенно определил категорию, меняем её
+        if (data.category) {
+             const found = CLOTHING_CATEGORIES.find(c => c.value === data.category);
+             if (found) {
+                 setCategory(found.value);
+                 setAiCategory(found.aiType);
+             }
+        } else if (data.aiCategory) {
+             setAiCategory(data.aiCategory);
+        }
+        
+        setSuccess("✨ Данные успешно сгенерированы AI!");
+        setTimeout(() => setSuccess(null), 3000);
+
+    } catch (err) {
+        console.error(err);
+        setError("Не удалось сгенерировать описание. Проверьте консоль.");
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
   // --- СОХРАНЕНИЕ ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
 
-    // Логика fallback:
-    // 1. Для совместимости со старым кодом заполняем одиночное поле tryOnImage первым элементом массива (или главным фото)
+    // Важно: берем первое фото из массива для совместимости со старыми версиями
     const primaryTryOn = tryOnImages.length > 0 ? tryOnImages[0] : image;
 
     const productData = {
@@ -123,10 +194,9 @@ export default function AdminProducts() {
       category, aiCategory,
       type, material, sizes, details,
       image, imageLarge, 
-      
-      additionalImages, // Галерея
-      tryOnImages,      // Новое поле: Массив вариантов
-      tryOnImage: primaryTryOn // Старое поле: Одиночное (для совместимости)
+      additionalImages, 
+      tryOnImages,      
+      tryOnImage: primaryTryOn 
     };
 
     try {
@@ -144,7 +214,6 @@ export default function AdminProducts() {
       setSuccess(editingId ? '✅ Товар успешно обновлён' : '✅ Товар успешно создан');
       fetchProducts();
       
-      // Сбрасываем форму только если это создание нового товара
       if (!editingId) resetForm(); 
       else window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -159,25 +228,18 @@ export default function AdminProducts() {
     setName(product.name);
     setDescription(product.description);
     setPrice(product.price || '');
-    
     setCategory(product.category || CLOTHING_CATEGORIES[0].value);
     setAiCategory(product.aiCategory || CLOTHING_CATEGORIES[0].aiType);
-    
     setType(product.type || 'product');
     setMaterial(product.material || '');
     setSizes(product.sizes || '');
     setDetails(product.details || '');
-    
     setEditingId(product._id);
-    
-    // Изображения
     setImage(product.image || '');
     setImageLarge(product.imageLarge || '');
     setAdditionalImages(product.additionalImages || []);
     
-    // 🔥 ВАЖНО: Миграция данных "на лету" при редактировании
-    // Если есть новый массив - берем его.
-    // Если нет массива, но есть старое одиночное фото - кладем его в массив.
+    // Миграция старых данных: если есть только tryOnImage, превращаем его в массив
     if (product.tryOnImages && product.tryOnImages.length > 0) {
         setTryOnImages(product.tryOnImages);
     } else if (product.tryOnImage) {
@@ -229,11 +291,31 @@ export default function AdminProducts() {
         
         {/* 1. Блок основных данных */}
         <div className="col-span-1 md:col-span-2 space-y-4">
-            <h3 className="text-lg font-bold text-gray-700 border-b pb-2 flex items-center gap-2">📦 Основная информация</h3>
+            <div className="flex justify-between items-end border-b pb-2">
+                <h3 className="text-lg font-bold text-gray-700">📦 Основная информация</h3>
+                {/* 🔥 КНОПКА AI ГЕНЕРАЦИИ */}
+                <button 
+                    type="button" 
+                    onClick={handleGenerateAI}
+                    disabled={isGenerating || !image}
+                    className={`text-sm px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-all shadow-sm
+                        ${isGenerating 
+                            ? 'bg-gray-100 text-gray-400 cursor-wait' 
+                            : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg hover:-translate-y-0.5'
+                        }`}
+                >
+                    {isGenerating ? (
+                        <><span className="animate-spin">⏳</span> Анализирую...</>
+                    ) : (
+                        <>✨ AI Автозаполнение</>
+                    )}
+                </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                     <label className="text-xs text-gray-500 ml-1">Название товара</label>
-                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="p-3 border rounded-xl w-full focus:ring-2 focus:ring-pink-200 outline-none" required />
+                    <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Например: Вечернее платье" className="p-3 border rounded-xl w-full focus:ring-2 focus:ring-pink-200 outline-none" required />
                 </div>
                 <div className="space-y-1">
                     <label className="text-xs text-gray-500 ml-1">Цена (TJS)</label>
@@ -241,8 +323,8 @@ export default function AdminProducts() {
                 </div>
             </div>
             <div className="space-y-1">
-                 <label className="text-xs text-gray-500 ml-1">Описание</label>
-                 <textarea value={description} onChange={e => setDescription(e.target.value)} className="p-3 border rounded-xl w-full h-32 focus:ring-2 focus:ring-pink-200 outline-none resize-none" required />
+                 <label className="text-xs text-gray-500 ml-1">Описание (Можно написать подсказки для AI сюда)</label>
+                 <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Например: Снимающиеся рукава, для свадьбы..." className="p-3 border rounded-xl w-full h-32 focus:ring-2 focus:ring-pink-200 outline-none resize-none" required />
             </div>
         </div>
 
@@ -251,7 +333,7 @@ export default function AdminProducts() {
             <h3 className="text-lg font-bold text-gray-700 border-b pb-2 flex items-center gap-2">🏷️ Характеристики и AI</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label className="text-xs text-gray-500 block mb-1">Категория (Влияет на алгоритм примерки):</label>
+                    <label className="text-xs text-gray-500 block mb-1">Категория:</label>
                     <select value={category} onChange={handleCategoryChange} className="p-3 border rounded-xl w-full bg-white focus:ring-2 focus:ring-pink-200 outline-none cursor-pointer">
                         {CLOTHING_CATEGORIES.map((cat) => (
                             <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -272,7 +354,7 @@ export default function AdminProducts() {
                         </select>
                      </div>
                      <div className="grid grid-cols-2 gap-2">
-                        <input type="text" placeholder="Материал" value={material} onChange={e => setMaterial(e.target.value)} className="p-3 border rounded-xl w-full text-sm" />
+                        <input type="text" placeholder="Материал (подсказка для AI)" value={material} onChange={e => setMaterial(e.target.value)} className="p-3 border rounded-xl w-full text-sm" />
                         <input type="text" placeholder="Размеры (S, M)" value={sizes} onChange={e => setSizes(e.target.value)} className="p-3 border rounded-xl w-full text-sm" />
                      </div>
                 </div>
@@ -291,7 +373,7 @@ export default function AdminProducts() {
                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                         <p className="font-bold text-sm text-gray-800 mb-2 flex justify-between">
                             1. Обложка товара
-                            <span className="text-xs font-normal text-gray-400">Для каталога</span>
+                            <span className="text-xs font-normal text-gray-400">Сначала загрузите это!</span>
                         </p>
                         <div className="flex items-start gap-4">
                              <div className="flex-1">
@@ -309,7 +391,7 @@ export default function AdminProducts() {
                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                         <p className="font-bold text-sm text-gray-800 mb-2 flex justify-between">
                             2. Галерея
-                            <span className="text-xs font-normal text-gray-400">Слайдер на странице</span>
+                            <span className="text-xs font-normal text-gray-400">Слайдер</span>
                         </p>
                         <ImageUpload onUpload={(url) => addImageToArray(url, setAdditionalImages)} label="+ Добавить в галерею" />
                         
@@ -391,15 +473,12 @@ export default function AdminProducts() {
       <div className="space-y-4 pb-20">
         <h2 className="text-xl font-bold text-gray-800 mt-12 mb-6 border-l-4 border-pink-500 pl-3">Ваши товары</h2>
         {products.map((product) => {
-            // Подсчет количества AI вариантов (поддержка старой и новой версии)
             const aiCount = product.tryOnImages?.length || (product.tryOnImage ? 1 : 0);
-            
             return (
               <div key={product._id} className="p-4 border border-gray-100 rounded-2xl flex flex-col sm:flex-row justify-between items-center bg-white shadow-sm hover:shadow-md transition-shadow gap-4">
                 <div className="flex gap-4 items-center w-full sm:w-auto">
                     <div className="w-16 h-16 relative shrink-0">
                          <Image src={getImageUrl(product.image)} alt={product.name} fill className="object-cover rounded-lg border border-gray-200" />
-                         {/* Индикатор AI */}
                          {aiCount > 0 && (
                             <div className="absolute -top-2 -right-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white text-[9px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-sm border border-white">
                                 {aiCount}
@@ -427,9 +506,6 @@ export default function AdminProducts() {
               </div>
             );
         })}
-        {products.length === 0 && !error && (
-            <div className="text-center py-10 text-gray-400">Список товаров пуст. Добавьте первый товар!</div>
-        )}
       </div>
     </div>
   );

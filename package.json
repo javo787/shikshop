@@ -11,6 +11,7 @@
     "db:index": "node src/scripts/createIndexes.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@gradio/client": "^2.0.1",
     "@huggingface/inference": "^4.13.5",
     "aos": "^2.3.4",
