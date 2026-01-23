@@ -114,7 +114,8 @@ function PhotoValidationModal({ isOpen, onClose, onConfirm, imageSrc, brightness
 }
 
 // --- ОСНОВНОЙ КОМПОНЕНТ ---
-export default function TryOnModal({ isOpen, onClose, garmentImage }) {
+// Добавили prop productId
+export default function TryOnModal({ isOpen, onClose, garmentImage, productId }) {
   const [personImage, setPersonImage] = useState(null);
   const [tempUploadedImage, setTempUploadedImage] = useState(null); 
   const [isValidationOpen, setIsValidationOpen] = useState(false);
@@ -145,7 +146,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
     return () => unsubscribe();
   }, [isOpen]);
 
-  // Эффект для анимации текста и прогресс-бара во время загрузки
+  // Эффект для анимации текста и прогресс-бара
   useEffect(() => {
     let msgInterval;
     let progressInterval;
@@ -161,8 +162,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
       setProgress(0);
       progressInterval = setInterval(() => {
         setProgress((prev) => {
-            // Быстро в начале, медленно в конце
-            if (prev >= 95) return 95; // Замираем на 95%
+            if (prev >= 95) return 95; 
             const increment = prev < 50 ? 1.5 : prev < 80 ? 0.5 : 0.1;
             return prev + increment;
         });
@@ -282,15 +282,22 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
   const onDragLeave = useCallback((e) => { e.preventDefault(); setIsDragging(false); }, []);
   const onDrop = useCallback((e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files?.[0]) processFile(e.dataTransfer.files[0]); }, []);
 
+  // --- ГЛАВНАЯ ЛОГИКА ЗАПУСКА ---
   const handleTryOn = async () => {
     if (!personImage || !garmentImage) return;
     setLoading(true); setError(null); setIsLimitReached(false); setStep('processing');
 
     try {
+      // 1. ЗАПУСК (POST)
       const startResponse = await fetch('/api/try-on', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ personImage, garmentImage, userId: user?.uid || null }),
+        body: JSON.stringify({ 
+            personImage, 
+            garmentImage, 
+            userId: user?.uid || null,
+            category: 'upper_body'
+        }),
       });
 
       const startData = await startResponse.json();
@@ -303,24 +310,48 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
         throw new Error(startData.error || "Ошибка запуска");
       }
 
+      const predictionId = startData.id;
+      const modelParams = startData.modelParams;
+
+      // 2. ОЖИДАНИЕ РЕЗУЛЬТАТА (POLLING GET)
       let prediction = startData;
       while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
-        await new Promise(r => setTimeout(r, 3000));
-        const check = await fetch(`/api/try-on?id=${prediction.id}`);
+        await new Promise(r => setTimeout(r, 3000)); // Ждем 3 сек
+        const check = await fetch(`/api/try-on?id=${predictionId}`);
         if (check.ok) prediction = await check.json();
       }
 
       if (prediction.status === 'failed') throw new Error("Нейросеть не справилась с фото. Попробуйте другое.");
 
+      // 3. ОБРАБОТКА РЕЗУЛЬТАТА
       let finalUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
       const brandedImage = await applyBranding(finalUrl);
+
+      // 4. ФИНАЛИЗАЦИЯ (PUT) - Отправка писем и сохранение
+      // Вызываем в фоне, чтобы пользователь не ждал отправки письма
+      try {
+          fetch('/api/try-on', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  predictionId: predictionId,
+                  userId: user?.uid || null,
+                  productId: productId || null, // Передаем ID товара
+                  personImage: personImage,
+                  garmentImage: garmentImage,
+                  modelParams: modelParams
+              })
+          }).then(() => console.log("✅ Результат сохранен и отправлен"));
+      } catch (err) {
+          console.warn("Ошибка сохранения/отправки почты:", err);
+      }
 
       if (prediction.remaining !== undefined) setRemainingTries(prediction.remaining);
 
       setCompliment(COMPLIMENTS[Math.floor(Math.random() * COMPLIMENTS.length)]);
       setGeneratedImage(brandedImage);
-      setProgress(100); // Сразу завершаем прогресс
-      await new Promise(r => setTimeout(r, 500)); // Небольшая пауза чтобы увидеть 100%
+      setProgress(100); 
+      await new Promise(r => setTimeout(r, 500));
       setStep('result');
 
     } catch (err) {
@@ -338,41 +369,35 @@ export default function TryOnModal({ isOpen, onClose, garmentImage }) {
 
   if (!isOpen) return null;
 
-  // --- НОВЫЙ RENDER PROCESSING ---
   const renderProcessing = () => {
     const currentStep = LOADING_STEPS[loadingStepIndex];
     return (
         <div className="flex flex-col items-center justify-center h-[400px] text-center animate-fadeIn w-full max-w-md mx-auto">
-          {/* Анимированный круг */}
           <div className="relative w-32 h-32 mb-8">
             <div className="absolute inset-0 border-8 border-gray-100 dark:border-gray-800 rounded-full"></div>
             <div 
                 className="absolute inset-0 border-8 border-primary-pink rounded-full border-t-transparent animate-spin"
                 style={{ animationDuration: '2s' }}
             ></div>
-            {/* Эмодзи внутри круга */}
             <div className="absolute inset-0 flex items-center justify-center text-4xl animate-bounce-slow">
                 {currentStep.emoji}
             </div>
           </div>
     
-          {/* Меняющийся текст */}
           <div className="h-16 flex items-center justify-center w-full px-4">
               <h4 
-                key={loadingStepIndex} // Ключ заставляет React перерисовывать анимацию при смене текста
+                key={loadingStepIndex} 
                 className="text-xl font-bold text-gray-800 dark:text-white animate-slideUp leading-tight"
               >
                 {currentStep.text}
               </h4>
           </div>
           
-          {/* Прогресс-бар */}
           <div className="w-full mt-6 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden relative">
               <div 
                 className="bg-linear-to-r from-pink-500 to-purple-600 h-2.5 rounded-full transition-all duration-300 ease-out relative" 
                 style={{ width: `${Math.floor(progress)}%` }}
               >
-                  {/* Блик на прогресс-баре */}
                   <div className="absolute inset-0 bg-white/30 w-full h-full animate-[shimmer_2s_infinite]"></div>
               </div>
           </div>

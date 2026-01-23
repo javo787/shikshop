@@ -3,16 +3,8 @@ import { connectMongoDB } from '@/lib/mongodb';
 import Order from '@/models/Order';
 import User from '@/models/User'; 
 import { sendTelegramNotification } from '@/lib/telegram';
-import nodemailer from 'nodemailer'; 
-
-// --- НАСТРОЙКА ПОЧТЫ (GMAIL) ---
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER, 
-    pass: process.env.GMAIL_PASS, 
-  },
-});
+// Импортируем нашу централизованную функцию почты
+import { sendOrderConfirmationEmail } from '@/lib/email'; 
 
 // --- СОЗДАНИЕ ЗАКАЗА (POST) ---
 export async function POST(req) {
@@ -43,76 +35,34 @@ export async function POST(req) {
       status: 'new'
     });
 
-    // 2. ОТПРАВКА EMAIL КЛИЕНТУ
-    try {
-      let targetEmail = userEmail;
+    // 2. ОТПРАВКА EMAIL КЛИЕНТУ (Через сервис)
+    // Эта логика не блокирует создание заказа, поэтому оборачиваем в try/catch внутри, но не прерываем ответ
+    (async () => {
+      try {
+        let targetEmail = userEmail;
 
-      // Если email не пришел с фронта, но юзер авторизован — ищем email в базе молча
-      if (!targetEmail && userId && userId !== 'Guest') {
-         const user = await User.findOne({ firebaseUid: userId }) || await User.findById(userId).catch(() => null);
-         if (user && user.email) {
-            targetEmail = user.email;
-         }
+        // Если email не пришел с фронта, но юзер авторизован — ищем email в базе
+        if (!targetEmail && userId && userId !== 'Guest') {
+           const user = await User.findOne({ firebaseUid: userId }) || await User.findById(userId).catch(() => null);
+           if (user && user.email) {
+              targetEmail = user.email;
+           }
+        }
+
+        if (targetEmail) {
+           await sendOrderConfirmationEmail({
+             email: targetEmail,
+             order: newOrder,
+             shippingAddress,
+             items,
+             totalAmount,
+             paymentMethod
+           });
+        }
+      } catch (bgError) {
+        console.error('⚠️ Background Email Error:', bgError);
       }
-
-      if (targetEmail) {
-        await transporter.sendMail({
-          from: '"PARIZOD Shop" <' + process.env.GMAIL_USER + '>',
-          to: targetEmail, 
-          subject: `✨ Заказ #${newOrder.orderNumber || newOrder._id.toString().slice(-6)} принят!`,
-          html: `
-            <div style="background-color: #f8f9fa; padding: 40px 0; font-family: sans-serif;">
-              <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
-                <div style="text-align: center; margin-bottom: 30px;">
-                  <h1 style="color: #ec4899; margin: 0; font-size: 28px;">PARIZOD</h1>
-                </div>
-                <h2 style="color: #111827; font-size: 20px; margin-bottom: 20px; text-align: center;">
-                  Спасибо за заказ, ${shippingAddress.name}! 💖
-                </h2>
-                <p style="color: #374151; font-size: 16px; text-align: center; margin-bottom: 30px;">
-                  Заказ <strong>#${newOrder.orderNumber || newOrder._id.toString().slice(-6)}</strong> принят в обработку.
-                </p>
-
-                <div style="background-color: #f3f4f6; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
-                  <table style="width: 100%; border-collapse: collapse;">
-                    ${items.map(item => `
-                      <tr>
-                        <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; color: #111827;">
-                          <strong>${item.name}</strong> <br/>
-                          <span style="font-size: 12px; color: #6b7280;">${item.quantity} шт.</span>
-                        </td>
-                        <td style="padding: 10px 0; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: bold;">
-                          ${item.price * item.quantity} TJS
-                        </td>
-                      </tr>
-                    `).join('')}
-                    <tr>
-                      <td style="padding-top: 15px; font-weight: bold;">Итого:</td>
-                      <td style="padding-top: 15px; text-align: right; font-weight: bold; color: #ec4899;">${totalAmount} TJS</td>
-                    </tr>
-                  </table>
-                </div>
-
-                <div style="margin-bottom: 30px; padding-left: 15px; border-left: 4px solid #ec4899;">
-                   <p style="color: #4b5563; margin: 5px 0;">Адрес: ${shippingAddress.address}</p>
-                   <p style="color: #4b5563; margin: 5px 0;">Телефон: <strong>${shippingAddress.phone}</strong></p>
-                   <p style="color: #4b5563; margin: 5px 0;">Оплата: ${paymentMethod === 'cash_on_delivery' ? 'При получении' : 'Картой'}</p>
-                </div>
-
-                <div style="text-align: center; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
-                  <p>© 2026 PARIZOD</p>
-                </div>
-              </div>
-            </div>
-          `
-        });
-        // Оставляем только этот лог успеха
-        console.log(`✅ Email отправлен на: ${targetEmail}`);
-      } 
-    } catch (emailError) {
-      // Лог ошибки оставляем обязательно!
-      console.error('❌ Ошибка отправки Email:', emailError);
-    }
+    })();
 
     // 3. Отправка в Telegram
     try {
