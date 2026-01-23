@@ -7,7 +7,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import ClientImage from '@/components/ClientImage';
 import ProductCard from '@/components/ProductCard';
-import TryOnModal from '@/components/TryOnModal';
+import TryOnModal from '@/components/TryOn';
 import Icon from '@/components/Icon';
 import AuthRequestModal from '@/components/AuthRequestModal';
 import TryOnSuggestion from '@/components/TryOnSuggestion';
