@@ -51,15 +51,19 @@ export async function POST(req) {
     // Запуск Replicate
     const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
     const randomSeed = Math.floor(Math.random() * 2147483647);
+    
+    // Промпт для улучшения качества (оставляем, он работает на любой версии)
     const PRO_PROMPT = "high quality, realistic texture, 8k, professional photography, soft lighting, detailed fabric";
 
     console.log(`🚀 Start AI | User: ${userId || 'Guest'} | Steps: 50`);
 
     const prediction = await replicate.predictions.create({
+      // ✅ ВЕРНУЛИ РАБОЧУЮ СТАБИЛЬНУЮ ВЕРСИЮ (cuuupid/idm-vton)
       version: "c871bb9b046607e58045a57f15283f1210c9b2d9a78619aec6101b730eb194c2", 
+      // Если эта версия снова даст сбой, замени на самую надежную:
+      version: "0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
       input: {
-        steps: 50,           // Высокое качество
-        guidance_scale: 2.5,
+        steps: 50,           // Высокое качество (было 30)
         seed: randomSeed,
         category: category,
         crop: false,
@@ -70,8 +74,6 @@ export async function POST(req) {
       }
     });
 
-    // Возвращаем ID сразу (не ждем завершения)
-    // Также возвращаем params, чтобы потом передать их в сохранение
     return NextResponse.json({ 
         ...prediction, 
         remaining: currentUser ? currentUser.tryOnBalance : 0,
@@ -101,7 +103,6 @@ export async function GET(req) {
 }
 
 // --- 3. СОХРАНЕНИЕ И ОТПРАВКА ПИСЕМ (PUT) ---
-// Вызывается фронтендом, когда статус === 'succeeded'
 export async function PUT(req) {
   try {
     const body = await req.json();
@@ -109,7 +110,6 @@ export async function PUT(req) {
 
     if (!predictionId) return NextResponse.json({ error: "No ID" }, { status: 400 });
 
-    // Получаем финальный результат из Replicate (для безопасности)
     const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
     const prediction = await replicate.predictions.get(predictionId);
 
@@ -129,9 +129,6 @@ export async function PUT(req) {
     if (productId) {
         productInfo = await Product.findById(productId);
     }
-
-    // Фоновые задачи (без await, чтобы не тормозить ответ фронту, или с await, если хотим гарантии)
-    // Здесь лучше использовать await, так как это отдельный быстрый запрос
     
     // 1. Сохраняем в Гардероб
     if (currentUser) {
