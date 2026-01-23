@@ -63,7 +63,7 @@ export async function POST(req) {
       // Если эта версия снова даст сбой, замени на самую надежную:
       version: "0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
       input: {
-        steps: 50,           // Высокое качество (было 30)
+        steps: 40,           // Высокое качество (было 30)
         seed: randomSeed,
         category: category,
         crop: false,
