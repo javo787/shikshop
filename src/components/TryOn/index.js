@@ -2,18 +2,20 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { auth } from '@/lib/firebase';
-import { applyBranding, analyzeImageQuality, COMPLIMENTS, LOADING_STEPS, ALLOWED_TYPES } from './utils';
+import { applyBranding, analyzeImageQuality, compressBase64Image, COMPLIMENTS, LOADING_STEPS, ALLOWED_TYPES } from './utils';
 
 import UploadView from './UploadView';
 import ResultView from './ResultView';
 import ProcessingView from './ProcessingView';
 import PhotoValidationModal from './PhotoValidationModal';
 import TutorialModal from './TutorialModal';
-import ImageCropper from './ImageCropper'; // 🔥 Импорт Кроппера
+import ImageCropper from './ImageCropper';
 
-export default function TryOnModal({ isOpen, onClose, garmentImage, productId, initialCategory }) {
+// 🔥 Важно: принимаем garmentCategory, как в оригинале
+export default function TryOnModal({ isOpen, onClose, garmentImage, productId, garmentCategory }) {
   const [step, setStep] = useState('upload'); 
-  const [category, setCategory] = useState('upper_body');
+  // Если garmentCategory не передан, по умолчанию upper_body
+  const [category, setCategory] = useState(garmentCategory || 'upper_body');
   
   const [personImage, setPersonImage] = useState(null);
   
@@ -42,15 +44,26 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, i
   
   const fileInputRef = useRef(null);
 
+  // --- 💾 1. Управление состоянием при открытии/закрытии (Persistence) ---
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => setUser(u));
-    if (!isOpen) setTimeout(() => resetAll(), 300);
-    return () => unsubscribe();
-  }, [isOpen]);
+    
+    if (isOpen) {
+      // При открытии: восстанавливаем фото из LocalStorage, если есть
+      const savedImage = localStorage.getItem('parizod_user_photo');
+      if (savedImage) {
+         setPersonImage(savedImage);
+      }
+      
+      // Синхронизируем категорию
+      if (garmentCategory) setCategory(garmentCategory);
+    } else {
+      // При закрытии: сбрасываем стейт (но не удаляем из LocalStorage, чтобы сохранить на будущее)
+      setTimeout(() => resetAll(), 300);
+    }
 
-  useEffect(() => {
-    if (initialCategory) setCategory(initialCategory);
-  }, [initialCategory]);
+    return () => unsubscribe();
+  }, [isOpen, garmentCategory]);
 
   useEffect(() => {
     let msgInterval, progressInterval;
@@ -64,54 +77,77 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, i
   }, [loading, step]);
 
   const resetAll = () => {
+    // Сбрасываем только UI состояния
     setPersonImage(null); setTempUploadedImage(null); setGeneratedImage(null);
     setTempImageForCrop(null); setIsCropperOpen(false);
     setStep('upload'); setError(null); setWarning(null); setLoading(false);
     setIsDragging(false); setIsLimitReached(false); setIsValidationOpen(false); setProgress(0);
-    if (initialCategory) setCategory(initialCategory);
+    if (garmentCategory) setCategory(garmentCategory);
   };
 
   const handleRetry = () => {
-      setIsTutorialOpen(true); 
+      // Сбрасываем только результат, фото пользователя оставляем
+      setStep('upload');
+      setGeneratedImage(null);
   };
 
-  const handleTutorialClose = () => {
-      setIsTutorialOpen(false);
-      resetAll(); 
+  // --- 🗑️ Функция для полного удаления фото (и из памяти, и из хранилища) ---
+  const handleClearUserPhoto = (val) => {
+      setPersonImage(val);
+      // Если передали null (нажали крестик), удаляем из памяти браузера
+      if (val === null) {
+          localStorage.removeItem('parizod_user_photo');
+      }
   };
 
   // 1. Начало процесса: Читаем файл и открываем Кроппер
   const processFile = (file) => {
     if (!file || !ALLOWED_TYPES.includes(file.type)) { setError('Только фото (JPG, PNG)'); return; }
     
-    // Читаем файл в Base64 для кроппера
     const reader = new FileReader();
     reader.onload = () => {
         setTempImageForCrop(reader.result);
-        setIsCropperOpen(true); // Открываем кроппер
+        setIsCropperOpen(true);
         setError(null);
     };
     reader.readAsDataURL(file);
   };
 
-  // 2. Кроппер завершен: Проверяем качество и открываем Валидацию
-  const handleCropComplete = (croppedImageBase64) => {
-      setIsCropperOpen(false); // Закрываем кроппер
+  // 2. Кроппер завершен: СЖИМАЕМ и проверяем
+  const handleCropComplete = async (croppedImageBase64) => {
+      setIsCropperOpen(false);
       
-      // Анализируем яркость обрезанного фото
-      const img = new Image();
-      img.src = croppedImageBase64;
-      img.onload = () => {
-          const warn = analyzeImageQuality(img);
-          setWarning(warn);
-          setTempUploadedImage(croppedImageBase64); // Готовим к валидации
-          setIsValidationOpen(true); // Открываем валидацию
-      };
+      try {
+          // 🔥 Сжимаем обрезанное фото до нормального размера (макс 1280px)
+          const compressed = await compressBase64Image(croppedImageBase64);
+          
+          const img = new Image();
+          img.src = compressed;
+          img.onload = () => {
+              const warn = analyzeImageQuality(img);
+              setWarning(warn);
+              setTempUploadedImage(compressed);
+              setIsValidationOpen(true);
+          };
+      } catch (e) {
+          console.error("Compression error", e);
+          setError("Ошибка обработки фото");
+      }
   };
 
-  // 3. Валидация пройдена: Сохраняем фото для отправки
+  // --- 💾 2. Сохраняем фото при подтверждении (БЕЗОПАСНАЯ ВЕРСИЯ) ---
   const handleValidationConfirm = () => {
       setPersonImage(tempUploadedImage); 
+      
+      try {
+          // Пытаемся сохранить в LocalStorage
+          localStorage.setItem('parizod_user_photo', tempUploadedImage);
+      } catch (e) {
+          // Если места нет (QuotaExceededError), просто выводим предупреждение в консоль
+          // Приложение продолжит работать, просто в следующий раз фото придется грузить заново
+          console.warn("Не удалось сохранить фото (возможно, нет места):", e);
+      }
+      
       setIsValidationOpen(false);
       setWarning(null); 
   };
@@ -124,10 +160,22 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, i
       const startRes = await fetch('/api/try-on', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ personImage, garmentImage, userId: user?.uid || null, category }),
+        body: JSON.stringify({ 
+            personImage, 
+            garmentImage, 
+            userId: user?.uid || null, 
+            category: category
+        }),
       });
       const startData = await startRes.json();
-      if (!startRes.ok) throw new Error(startData.message || startData.error || "Ошибка запуска");
+      
+      if (!startRes.ok) {
+        if (startData.error === 'LIMIT_REACHED_GUEST' || startData.error === 'LIMIT_REACHED_BUY') {
+            setError(startData.message || 'Лимит исчерпан.');
+            setIsLimitReached(true); setStep('upload'); setLoading(false); return;
+        }
+        throw new Error(startData.message || startData.error || "Ошибка запуска");
+      }
 
       const predictionId = startData.id;
       let pred = startData;
@@ -142,6 +190,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, i
       const finalUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
       const branded = await applyBranding(finalUrl);
 
+      // Обновляем историю
       fetch('/api/try-on', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
           predictionId: pred.id, userId: user?.uid, productId, personImage, garmentImage, modelParams: pred.modelParams
       })});
@@ -169,14 +218,14 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, i
     <>
       <div className={"fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn " + (!isOpen ? "hidden" : "")}>
         <div className="absolute inset-0" onClick={onClose}></div>
-        <div className="relative bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh] z-10 border border-white/40 dark:border-gray-700 h-full max-h-[700px]">
+        <div className="relative bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col h-full max-h-[95vh] z-10 border border-white/40 dark:border-gray-700">
           
           <div className="flex justify-between items-center p-5 border-b border-gray-100 dark:border-gray-800 bg-white/50 backdrop-blur-sm shrink-0">
-            <h3 className="text-2xl font-bold bg-linear-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-3">✨ Виртуальная примерочная</h3>
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-3">✨ Виртуальная примерочная</h3>
             <button onClick={onClose} className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500">✕</button>
           </div>
           
-          <div className="flex-1 overflow-hidden relative">
+          <div className="flex-1 overflow-y-auto relative scrollbar-thin scrollbar-thumb-gray-200">
             {step === 'processing' && (
                 <ProcessingView loadingStepIndex={loadingStepIndex} progress={progress} />
             )}
@@ -184,6 +233,8 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, i
             {step === 'result' && generatedImage && (
                 <ResultView 
                     generatedImage={generatedImage} 
+                    // 🔥 Передаем исходное фото для слайдера До/После
+                    personImage={personImage} 
                     compliment={compliment} 
                     handleDownload={handleDownload} 
                     onRetry={handleRetry} 
@@ -194,16 +245,19 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, i
             {step === 'upload' && (
                 <UploadView 
                     user={user} category={category} setCategory={setCategory}
-                    personImage={personImage} setPersonImage={setPersonImage}
+                    personImage={personImage} 
+                    // 🔥 Используем обертку для удаления из LocalStorage
+                    setPersonImage={handleClearUserPhoto} 
                     garmentImage={garmentImage} loading={loading}
                     isLimitReached={isLimitReached} processFile={processFile}
                     fileInputRef={fileInputRef} isDragging={isDragging}
                     setIsDragging={setIsDragging} onStart={handleTryOn}
+                    garmentCategoryProp={garmentCategory} 
                 />
             )}
 
             {error && (
-                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-3/4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-center font-medium animate-shake shadow-lg z-20">
+                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-3/4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-center font-medium animate-shake shadow-lg z-20">
                     {error}
                 </div>
             )}
@@ -211,9 +265,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, i
         </div>
       </div>
 
-      {/* МОДАЛКИ ПОВЕРХ */}
-      
-      {/* 1. КРОППЕР (Первым делом) */}
       {isCropperOpen && (
           <ImageCropper 
             imageSrc={tempImageForCrop}
@@ -222,7 +273,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, i
           />
       )}
 
-      {/* 2. ВАЛИДАЦИЯ (После кроппера) */}
       <PhotoValidationModal 
         isOpen={isValidationOpen} 
         onClose={() => setIsValidationOpen(false)} 
@@ -231,8 +281,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, i
         brightnessWarning={warning} 
       />
 
-      {/* 3. ОБУЧЕНИЕ (При повторе) */}
-      <TutorialModal isOpen={isTutorialOpen} onClose={handleTutorialClose} />
+      <TutorialModal isOpen={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
     </>
   );
 }
