@@ -1,12 +1,13 @@
 // src/components/TryOn/UploadView.js
 import Image from 'next/image';
-import ClientImage from '../ClientImage'; // Путь может отличаться, проверьте импорты
+import ClientImage from '../ClientImage'; 
 import { ALLOWED_TYPES } from './utils';
 
 export default function UploadView({ 
     user, category, setCategory, personImage, setPersonImage, 
     garmentImage, loading, isLimitReached, processFile, fileInputRef,
-    isDragging, setIsDragging, onStart 
+    isDragging, setIsDragging, onStart, 
+    onOpenTutorial // 🔥 Новая пропса
 }) {
     
     // Рендер переключателя категорий
@@ -44,10 +45,19 @@ export default function UploadView({
                     <div className="flex flex-col gap-4">
                         {renderCategoryInfo()}
 
-                        <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">2</span> 
-                            Ваше фото
-                        </p>
+                        <div className="flex justify-between items-center">
+                            <p className="font-bold text-gray-700 dark:text-white flex items-center gap-2">
+                                <span className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-sm font-bold">2</span> 
+                                Ваше фото
+                            </p>
+                            {/* 🔥 Кнопка открытия туториала */}
+                            <button 
+                                onClick={onOpenTutorial}
+                                className="text-xs text-pink-600 font-bold hover:underline flex items-center gap-1 bg-pink-50 px-2 py-1 rounded-lg"
+                            >
+                                💡 Как это работает?
+                            </button>
+                        </div>
                         
                         <div className="p-3 rounded-xl border text-xs flex gap-2 items-start bg-blue-50 border-blue-100 text-blue-700">
                             <span className="text-lg">ℹ️</span>
@@ -66,8 +76,8 @@ export default function UploadView({
                             ) : personImage ? (
                                 <>
                                     <Image src={personImage} alt="Вы" fill className="object-cover rounded-xl" unoptimized />
-                                    <button onClick={(e) => { e.stopPropagation(); setPersonImage(null); }} className="absolute top-3 right-3 bg-white rounded-full p-2 text-red-500 shadow-lg z-10">✕</button>
-                                    <div className="absolute bottom-3 bg-green-500/90 text-white text-xs px-3 py-1 rounded-full font-bold">Фото готово</div>
+                                    <button onClick={(e) => { e.stopPropagation(); setPersonImage(null); }} className="absolute top-3 right-3 bg-white rounded-full p-2 text-red-500 shadow-lg z-10 hover:scale-110 transition-transform">✕</button>
+                                    <div className="absolute bottom-3 bg-green-500/90 text-white text-xs px-3 py-1 rounded-full font-bold shadow-md">Фото готово</div>
                                 </>
                             ) : (
                                 <div className="text-center p-6 pointer-events-none">
@@ -95,7 +105,7 @@ export default function UploadView({
 
             {/* Футер с кнопкой */}
             <div className="p-5 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-4 bg-gray-50/80 backdrop-blur-sm">
-                <button disabled={!personImage || loading || isLimitReached} onClick={onStart} className={`px-8 py-3 rounded-xl text-white font-bold shadow-lg transition-all ${personImage && !loading ? 'bg-linear-to-r from-pink-600 to-purple-600 hover:scale-105' : 'bg-gray-300 cursor-not-allowed'}`}>
+                <button disabled={!personImage || loading || isLimitReached} onClick={onStart} className={`px-8 py-3 rounded-xl text-white font-bold shadow-lg transition-all ${personImage && !loading ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:scale-105' : 'bg-gray-300 cursor-not-allowed'}`}>
                     {loading ? 'Запуск...' : '✨ Примерить'}
                 </button>
             </div>

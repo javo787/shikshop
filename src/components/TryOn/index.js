@@ -11,15 +11,13 @@ import PhotoValidationModal from './PhotoValidationModal';
 import TutorialModal from './TutorialModal';
 import ImageCropper from './ImageCropper';
 
-// 🔥 Важно: принимаем garmentCategory, как в оригинале
 export default function TryOnModal({ isOpen, onClose, garmentImage, productId, garmentCategory }) {
   const [step, setStep] = useState('upload'); 
-  // Если garmentCategory не передан, по умолчанию upper_body
   const [category, setCategory] = useState(garmentCategory || 'upper_body');
   
   const [personImage, setPersonImage] = useState(null);
   
-  // Состояния для Кроппера
+  // Кроппер
   const [tempImageForCrop, setTempImageForCrop] = useState(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
 
@@ -27,7 +25,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
   const [generatedImage, setGeneratedImage] = useState(null);
   
   const [isValidationOpen, setIsValidationOpen] = useState(false);
-  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false); // Изначально false
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -44,24 +42,35 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
   
   const fileInputRef = useRef(null);
 
-  // --- 💾 1. Управление состоянием при открытии/закрытии (Persistence) ---
+  // --- ЛОГИКА ТУТОРИАЛА ---
+  useEffect(() => {
+    if (isOpen) {
+        // Проверяем, видел ли пользователь туториал раньше
+        const hasSeenTutorial = localStorage.getItem('parizod_tutorial_seen');
+        if (!hasSeenTutorial) {
+            // Если нет, показываем и запоминаем
+            setIsTutorialOpen(true);
+            localStorage.setItem('parizod_tutorial_seen', 'true');
+        }
+    }
+  }, [isOpen]);
+
+  // Функция для ручного открытия туториала (передадим в UploadView)
+  const handleManualTutorialOpen = () => {
+      setIsTutorialOpen(true);
+  };
+
+  // --- Сохранение сессии ---
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => setUser(u));
     
     if (isOpen) {
-      // При открытии: восстанавливаем фото из LocalStorage, если есть
       const savedImage = localStorage.getItem('parizod_user_photo');
-      if (savedImage) {
-         setPersonImage(savedImage);
-      }
-      
-      // Синхронизируем категорию
+      if (savedImage) setPersonImage(savedImage);
       if (garmentCategory) setCategory(garmentCategory);
     } else {
-      // При закрытии: сбрасываем стейт (но не удаляем из LocalStorage, чтобы сохранить на будущее)
       setTimeout(() => resetAll(), 300);
     }
-
     return () => unsubscribe();
   }, [isOpen, garmentCategory]);
 
@@ -77,7 +86,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
   }, [loading, step]);
 
   const resetAll = () => {
-    // Сбрасываем только UI состояния
     setPersonImage(null); setTempUploadedImage(null); setGeneratedImage(null);
     setTempImageForCrop(null); setIsCropperOpen(false);
     setStep('upload'); setError(null); setWarning(null); setLoading(false);
@@ -86,48 +94,40 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
   };
 
   const handleRetry = () => {
-      // Сбрасываем только результат, фото пользователя оставляем
       setStep('upload');
       setGeneratedImage(null);
   };
 
-  // --- 🗑️ Функция для полного удаления фото (и из памяти, и из хранилища) ---
   const handleClearUserPhoto = (val) => {
       setPersonImage(val);
-      // Если передали null (нажали крестик), удаляем из памяти браузера
-      if (val === null) {
-          localStorage.removeItem('parizod_user_photo');
-      }
+      if (val === null) localStorage.removeItem('parizod_user_photo');
   };
 
-  // 1. Начало процесса: Читаем файл и открываем Кроппер
+  // 1. Загрузка файла -> Открытие Кроппера
   const processFile = (file) => {
     if (!file || !ALLOWED_TYPES.includes(file.type)) { setError('Только фото (JPG, PNG)'); return; }
     
     const reader = new FileReader();
     reader.onload = () => {
         setTempImageForCrop(reader.result);
-        setIsCropperOpen(true);
+        setIsCropperOpen(true); // Открываем кроппер
         setError(null);
     };
     reader.readAsDataURL(file);
   };
 
-  // 2. Кроппер завершен: СЖИМАЕМ и проверяем
+  // 2. Кроппер завершен -> Сжатие и Валидация
   const handleCropComplete = async (croppedImageBase64) => {
       setIsCropperOpen(false);
-      
       try {
-          // 🔥 Сжимаем обрезанное фото до нормального размера (макс 1280px)
           const compressed = await compressBase64Image(croppedImageBase64);
-          
           const img = new Image();
           img.src = compressed;
           img.onload = () => {
               const warn = analyzeImageQuality(img);
               setWarning(warn);
               setTempUploadedImage(compressed);
-              setIsValidationOpen(true);
+              setIsValidationOpen(true); // Открываем валидацию
           };
       } catch (e) {
           console.error("Compression error", e);
@@ -135,19 +135,10 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
       }
   };
 
-  // --- 💾 2. Сохраняем фото при подтверждении (БЕЗОПАСНАЯ ВЕРСИЯ) ---
+  // 3. Валидация пройдена -> Сохранение
   const handleValidationConfirm = () => {
       setPersonImage(tempUploadedImage); 
-      
-      try {
-          // Пытаемся сохранить в LocalStorage
-          localStorage.setItem('parizod_user_photo', tempUploadedImage);
-      } catch (e) {
-          // Если места нет (QuotaExceededError), просто выводим предупреждение в консоль
-          // Приложение продолжит работать, просто в следующий раз фото придется грузить заново
-          console.warn("Не удалось сохранить фото (возможно, нет места):", e);
-      }
-      
+      try { localStorage.setItem('parizod_user_photo', tempUploadedImage); } catch (e) { console.warn(e); }
       setIsValidationOpen(false);
       setWarning(null); 
   };
@@ -161,10 +152,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-            personImage, 
-            garmentImage, 
-            userId: user?.uid || null, 
-            category: category
+            personImage, garmentImage, userId: user?.uid || null, category: category
         }),
       });
       const startData = await startRes.json();
@@ -190,7 +178,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
       const finalUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
       const branded = await applyBranding(finalUrl);
 
-      // Обновляем историю
       fetch('/api/try-on', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
           predictionId: pred.id, userId: user?.uid, productId, personImage, garmentImage, modelParams: pred.modelParams
       })});
@@ -233,7 +220,6 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
             {step === 'result' && generatedImage && (
                 <ResultView 
                     generatedImage={generatedImage} 
-                    // 🔥 Передаем исходное фото для слайдера До/После
                     personImage={personImage} 
                     compliment={compliment} 
                     handleDownload={handleDownload} 
@@ -246,13 +232,13 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
                 <UploadView 
                     user={user} category={category} setCategory={setCategory}
                     personImage={personImage} 
-                    // 🔥 Используем обертку для удаления из LocalStorage
                     setPersonImage={handleClearUserPhoto} 
                     garmentImage={garmentImage} loading={loading}
                     isLimitReached={isLimitReached} processFile={processFile}
                     fileInputRef={fileInputRef} isDragging={isDragging}
                     setIsDragging={setIsDragging} onStart={handleTryOn}
-                    garmentCategoryProp={garmentCategory} 
+                    // 🔥 Передаем функцию открытия туториала
+                    onOpenTutorial={handleManualTutorialOpen}
                 />
             )}
 
@@ -281,6 +267,7 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
         brightnessWarning={warning} 
       />
 
+      {/* Модальное окно туториала */}
       <TutorialModal isOpen={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
     </>
   );
