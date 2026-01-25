@@ -33,7 +33,7 @@ export async function sendClientResultEmail({ email, userName, resultUrl, produc
             Купить ${productName || 'этот товар'}
           </a>
           <br/><br/>
-          <a href="https://parizod.tj" style="color: #666; font-size: 14px;">Попробовать еще раз</a>
+          <a href="https://shikshop.vercel.app" style="color: #666; font-size: 14px;">Попробовать еще раз</a>
         </div>
       </div>
     `
