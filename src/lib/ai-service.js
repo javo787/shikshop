@@ -6,21 +6,21 @@ export const AI_MODELS = {
   // 1. Стандартная качественная примерка (IDM-VTON)
   'replicate-idm-vton': {
     provider: 'replicate',
-    id: "c871bb9b046607e58045a57f15283f1210c9b2d9a78619aec6101b730eb194c2", 
+    id: "c871bb9b046607e58045a57f15283f1210c9b2d9a78619aec6101b730eb194c2",
     type: "vton",
     defaultParams: { steps: 40, crop: false }
   },
-  
+
   // 2. 🔥 НОВАЯ: Google Nano Banana (Gemini Flash Image)
   'google-nano-banana': {
     provider: 'replicate',
-    // Мы не указываем жесткий ID, а указываем имя модели.
-    // Код ниже сам найдет актуальную версию.
-    modelStr: "google/nano-banana", 
-    type: "editor", 
-    defaultParams: { 
-        safety_filter_level: "block_only_high", 
-        output_format: "png"
+    // ВАЖНО: Разделили владельца и имя, чтобы API не выдавал 404
+    modelOwner: "google",
+    modelName: "nano-banana",
+    type: "editor",
+    defaultParams: {
+      // В документации prompt обязателен, его мы добавим в функции
+      output_format: "png"
     }
   },
 
@@ -42,36 +42,42 @@ export async function runReplicate(modelKey, inputs) {
   let versionId = modelConfig.id;
 
   // === АДАПТЕР ВХОДНЫХ ДАННЫХ ===
-  
+
   // А) Если это IDM-VTON (Примерка)
   if (modelConfig.type === 'vton') {
-      finalInput = { 
-          ...modelConfig.defaultParams, 
-          ...inputs 
-      };
-  } 
-  
-  // Б) Если это Nano Banana (Редактор)
-  else if (modelConfig.type === 'editor') {
-      const prompt = `Realistic virtual try-on. Replace the clothes of the person in the first image with the garment shown in the second image. Keep the person's pose and identity exactly the same. High quality, photorealistic.`;
-      
-      finalInput = {
-          ...modelConfig.defaultParams,
-          prompt: prompt,
-          image_input: [inputs.human_img, inputs.garm_img], // Массив картинок!
-          aspect_ratio: "match_input_image"
-      };
-
-      // 🔥 ИСПРАВЛЕНИЕ:
-      // Если у нас нет жесткого ID версии (как у Nano Banana), мы получаем его динамически.
-      // Это позволяет использовать .predictions.create и получить ID для фронтенда.
-      if (!versionId && modelConfig.modelStr) {
-          const model = await replicate.models.get(modelConfig.modelStr);
-          versionId = model.latest_version.id;
-      }
+    finalInput = {
+      ...modelConfig.defaultParams,
+      ...inputs
+    };
   }
 
-  // Запуск через predictions.create (всегда возвращает ID!)
+  // Б) Если это Nano Banana (Редактор)
+  else if (modelConfig.type === 'editor') {
+    // Nano Banana работает как редактор по промпту
+    const prompt = `Realistic virtual try-on. Replace the clothes of the person in the first image with the garment shown in the second image. Keep the person's pose and identity exactly the same. High quality, photorealistic.`;
+
+    finalInput = {
+      ...modelConfig.defaultParams,
+      prompt: prompt,
+      // Nano Banana принимает массив картинок
+      image_input: [inputs.human_img, inputs.garm_img],
+      // aspect_ratio не обязателен, если не указан - берется как у оригинала
+    };
+
+    // 🔥 ИСПРАВЛЕНИЕ: Получаем ID версии правильно
+    if (!versionId && modelConfig.modelOwner && modelConfig.modelName) {
+      try {
+        // Передаем ДВА аргумента: ("google", "nano-banana")
+        const model = await replicate.models.get(modelConfig.modelOwner, modelConfig.modelName);
+        versionId = model.latest_version.id;
+      } catch (e) {
+        console.error("Ошибка получения версии модели Replicate:", e);
+        throw new Error(`Не удалось найти модель ${modelConfig.modelOwner}/${modelConfig.modelName}`);
+      }
+    }
+  }
+
+  // Запуск через predictions.create (всегда возвращает ID, чтобы фронтенд мог ждать)
   return await replicate.predictions.create({
     version: versionId,
     input: finalInput
