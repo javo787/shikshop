@@ -1,4 +1,3 @@
-// lib/ai-service.js
 import Replicate from "replicate";
 import { GoogleAuth } from 'google-auth-library';
 
@@ -8,17 +7,19 @@ export const AI_MODELS = {
   'replicate-idm-vton': {
     provider: 'replicate',
     id: "c871bb9b046607e58045a57f15283f1210c9b2d9a78619aec6101b730eb194c2", 
-    type: "vton", // Тип: специализированый VTON
+    type: "vton",
     defaultParams: { steps: 40, crop: false }
   },
   
   // 2. 🔥 НОВАЯ: Google Nano Banana (Gemini Flash Image)
   'google-nano-banana': {
     provider: 'replicate',
-    modelStr: "google/nano-banana", // Используем имя модели, чтобы всегда брать последнюю версию
-    type: "editor", // Тип: умный редактор
+    // Мы не указываем жесткий ID, а указываем имя модели.
+    // Код ниже сам найдет актуальную версию.
+    modelStr: "google/nano-banana", 
+    type: "editor", 
     defaultParams: { 
-        safety_filter_level: "block_only_high", // Менее строгий фильтр
+        safety_filter_level: "block_only_high", 
         output_format: "png"
     }
   },
@@ -30,56 +31,54 @@ export const AI_MODELS = {
   }
 };
 
-// --- ФУНКЦИЯ REPLICATE (С АДАПТЕРОМ) ---
+// --- ФУНКЦИЯ REPLICATE ---
 export async function runReplicate(modelKey, inputs) {
   const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
   const modelConfig = AI_MODELS[modelKey];
 
   if (!modelConfig) throw new Error(`Модель ${modelKey} не найдена`);
 
-  let versionId = modelConfig.id;
   let finalInput = {};
+  let versionId = modelConfig.id;
 
   // === АДАПТЕР ВХОДНЫХ ДАННЫХ ===
   
-  // А) Если это спец. модель для примерки (IDM-VTON)
+  // А) Если это IDM-VTON (Примерка)
   if (modelConfig.type === 'vton') {
       finalInput = { 
           ...modelConfig.defaultParams, 
-          ...inputs // { human_img, garm_img, category, ... }
+          ...inputs 
       };
   } 
   
-  // Б) Если это Google Nano Banana (Editor)
+  // Б) Если это Nano Banana (Редактор)
   else if (modelConfig.type === 'editor') {
-      // Nano Banana хочет массив картинок и промпт, а не human_img/garm_img
-      // Формируем умный промпт для нейросети
       const prompt = `Realistic virtual try-on. Replace the clothes of the person in the first image with the garment shown in the second image. Keep the person's pose and identity exactly the same. High quality, photorealistic.`;
       
       finalInput = {
           ...modelConfig.defaultParams,
           prompt: prompt,
-          // Передаем картинки как список: [Человек, Одежда]
-          image_input: [inputs.human_img, inputs.garm_img],
+          image_input: [inputs.human_img, inputs.garm_img], // Массив картинок!
           aspect_ratio: "match_input_image"
       };
-      
-      // Для запуска по имени модели (без ID версии) используется другая команда, 
-      // но replicate-js умеет работать и так, если передать owner/name в version
-      // Однако надежнее использовать run() с именем модели
-      return await replicate.run(modelConfig.modelStr, { input: finalInput });
+
+      // 🔥 ИСПРАВЛЕНИЕ:
+      // Если у нас нет жесткого ID версии (как у Nano Banana), мы получаем его динамически.
+      // Это позволяет использовать .predictions.create и получить ID для фронтенда.
+      if (!versionId && modelConfig.modelStr) {
+          const model = await replicate.models.get(modelConfig.modelStr);
+          versionId = model.latest_version.id;
+      }
   }
 
-  // Запуск по ID версии (для IDM-VTON)
-  if (versionId) {
-      return await replicate.predictions.create({
-        version: versionId,
-        input: finalInput
-      });
-  }
+  // Запуск через predictions.create (всегда возвращает ID!)
+  return await replicate.predictions.create({
+    version: versionId,
+    input: finalInput
+  });
 }
 
-// --- ФУНКЦИЯ GOOGLE VERTEX (Оставляем как есть) ---
+// --- ФУНКЦИЯ GOOGLE VERTEX ---
 export async function runGoogle(personBase64, garmentBase64) {
   const REGION = AI_MODELS['google-vertex'].region;
   const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID;

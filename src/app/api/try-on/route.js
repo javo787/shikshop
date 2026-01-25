@@ -2,20 +2,20 @@ import { NextResponse } from "next/server";
 import { connectMongoDB } from '@/lib/mongodb';
 import User from '@/models/User';
 import TryOnLog from '@/models/TryOnLog';
-// import Wardrobe from '@/models/Wardrobe'; // <-- Пока отключено
 import Product from '@/models/Product';
 import { sendClientResultEmail, sendAdminDebugEmail } from '@/lib/email'; 
+// Импортируем сервисы нейросетей
 import { runReplicate, runGoogle, AI_MODELS } from '@/lib/ai-service';
-import { addBranding } from '@/lib/image-processing';
+// 🔥 ВЕРНУЛИ ИМПОРТ БРЕНДИНГА
+import { addBranding } from '@/lib/image-processing'; 
 import Replicate from "replicate"; 
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // Увеличиваем тайм-аут
+export const maxDuration = 60; 
 
 // --- 1. POST: Запуск генерации ---
 export async function POST(req) {
   try {
-    // modelKey - это ключ из AI_MODELS (например 'replicate-idm-vton')
     const { personImage, garmentImage, userId, category = "upper_body", modelKey = 'google-vertex' } = await req.json();
     const ip = req.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = req.headers.get('user-agent') || 'unknown';
@@ -55,13 +55,13 @@ export async function POST(req) {
         try {
             const rawResult = await runGoogle(personImage, garmentImage);
             
-            // 🔥 Накладываем логотип ПРЯМО ЗДЕСЬ
+            // 🔥 ВЕРНУЛИ НАЛОЖЕНИЕ ЛОГОТИПА
             const brandedResult = await addBranding(rawResult);
 
             return NextResponse.json({ 
                 id: `google-${Date.now()}`,
                 status: "succeeded", 
-                output: brandedResult, // Отдаем уже с логотипом
+                output: brandedResult, // Отдаем картинку с логотипом
                 remaining: currentUser ? currentUser.tryOnBalance : 0
             });
         } catch (err) {
@@ -74,18 +74,18 @@ export async function POST(req) {
         }
     } 
     
-    // 2. Replicate (Асинхронный - любая модель из конфига)
+    // 2. Replicate (Асинхронный - теперь работает корректно с ID)
     else if (AI_MODELS[modelKey]?.provider === 'replicate') {
         const prediction = await runReplicate(modelKey, {
             human_img: personImage,
             garm_img: garmentImage,
-            category: category,
-            garment_des: "high quality, realistic texture"
+            category: category
         });
 
+        // Возвращаем ID, чтобы фронтенд мог делать polling (опрос)
         return NextResponse.json({ 
-            id: prediction.id,
-            status: "starting", // Фронтенд должен делать polling
+            id: prediction.id, 
+            status: "starting", 
             remaining: currentUser ? currentUser.tryOnBalance : 0
         });
     }
@@ -105,11 +105,26 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
-    if (id && id.startsWith('google-')) return NextResponse.json({ status: "succeeded" });
+    // Защита от "undefined" ошибки
+    if (!id || id === 'undefined' || id === 'null') {
+        return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
 
-    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
-    const prediction = await replicate.predictions.get(id);
-    return NextResponse.json(prediction);
+    if (id.startsWith('google-')) return NextResponse.json({ status: "succeeded" });
+
+    try {
+        const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
+        const prediction = await replicate.predictions.get(id);
+        
+        if (prediction.status === 'failed') {
+            return NextResponse.json({ status: 'failed', error: prediction.error });
+        }
+
+        return NextResponse.json(prediction);
+    } catch (e) {
+        console.error("Replicate GET error:", e);
+        return NextResponse.json({ error: e.message }, { status: 500 });
+    }
 }
 
 // --- 3. PUT: Финализация (Сохранение + Письма) ---
@@ -120,15 +135,14 @@ export async function PUT(req) {
 
     let finalImage = resultImageOverride;
 
-    // Если это Replicate, результат нужно забрать из API
-    if (!finalImage && predictionId && !predictionId.startsWith('google-')) {
+    // Если это Replicate (и картинка еще не передана с фронтенда)
+    if (!finalImage && predictionId && !predictionId.startsWith('google-') && predictionId !== 'undefined') {
         const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
         const prediction = await replicate.predictions.get(predictionId);
         
         if (prediction.status === 'succeeded') {
-             // Replicate отдает URL, нам нужно его скачать и наложить лого
              const rawUrl = prediction.output;
-             // 🔥 Накладываем логотип (скачает URL, добавит лого, вернет Base64)
+             // 🔥 ВЕРНУЛИ НАЛОЖЕНИЕ ЛОГОТИПА ДЛЯ REPLICATE
              finalImage = await addBranding(rawUrl);
         }
     }
@@ -142,36 +156,17 @@ export async function PUT(req) {
 
     let productInfo = null;
     if (productId) productInfo = await Product.findById(productId);
-    
-    // --- СОХРАНЕНИЕ В ГАРДЕРОБ ---
-    // Проверяем, существует ли модель Wardrobe (ты сказал, пока не реализовал)
-    /*
-    try {
-        if (currentUser) {
-             // Здесь сохраняем. В будущем лучше сохранять URL (S3), а не Base64
-             await Wardrobe.create({
-                userId: currentUser._id,
-                resultImage: finalImage, // Уже с логотипом
-                originalImage: personImage,
-                // ...
-             });
-        }
-    } catch (dbError) {
-        console.warn("⚠️ Ошибка сохранения в Гардероб (возможно, схема не готова):", dbError.message);
-        // Не прерываем выполнение, идем к письмам
-    }
-    */
 
     // --- ОТПРАВКА ПИСЕМ ---
-    // Отправляем finalImage (который уже Base64 c логотипом)
     const emailPromises = [];
 
     if (currentUser && currentUser.email) {
+        // Обновил ссылку на твой новый домен из примера
         const productLink = productId ? `https://shikshop.vecel.app/product/${productId}` : 'https://shikshop.vecel.app/catalog';
         emailPromises.push(sendClientResultEmail({
             email: currentUser.email,
             userName: currentUser.name,
-            resultUrl: finalImage, // Важно: некоторые почтовики не любят длинные Base64
+            resultUrl: finalImage,
             productLink: productLink,
             productName: productInfo ? productInfo.name : 'Товар'
         }));
