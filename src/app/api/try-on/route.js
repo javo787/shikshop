@@ -13,7 +13,7 @@ export const maxDuration = 60;
 
 // --- КОНФИГУРАЦИЯ ---
 const REGION = 'us-central1'; // Основной регион для Vertex AI
-const API_ENDPOINT = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${process.env.GOOGLE_CLOUD_PROJECT_ID}/locations/${REGION}/publishers/google/models/virtual-try-on-001:predict`;
+const API_ENDPOINT = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${process.env.GOOGLE_CLOUD_PROJECT_ID}/locations/${REGION}/publishers/google/models/virtual-try-on-preview:predict`;
 
 /**
  * Функция вызова Google Vertex AI
@@ -246,5 +246,5 @@ export async function PUT(req) {
   } catch (error) {
     console.error("❌ Save/Email Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  } 
 }
