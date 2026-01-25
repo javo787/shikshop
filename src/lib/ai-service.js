@@ -1,9 +1,9 @@
+// lib/ai-service.js
 import Replicate from "replicate";
 import { GoogleAuth } from 'google-auth-library';
 
 // --- КОНСТАНТЫ И НАСТРОЙКИ ---
 
-// Словарь дефолтных описаний (Помогает IDM-VTON понять форму одежды)
 const DEFAULT_DESCRIPTIONS = {
     'dresses': "A high-quality dress, full body garment, realistic fabric texture, intricate details",
     'upper_body': "A high-quality upper body top, shirt, realistic fabric texture",
@@ -15,12 +15,13 @@ export const AI_MODELS = {
   // 1. IDM-VTON (Золотой стандарт для одежды)
   'replicate-idm-vton': {
     provider: 'replicate',
-    id: "c871bb9b046607e58045a57f15283f1210c9b2d9a78619aec6101b730eb194c2", 
+    // 🔥 ОБНОВЛЕННЫЙ ID (Версия, которую вы прислали)
+    id: "0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985", 
     type: "vton",
     defaultParams: { 
-        steps: 50, // 🔥 Максимальное качество (было 40)
-        crop: false, // Мы кропаем на фронте, тут отключаем авто-кроп
-        seed: 42 // Фиксированный сид для стабильности (или убери для рандома)
+        steps: 30, // Стандартное значение для этой версии
+        crop: false, 
+        seed: 42
     }
   },
   
@@ -30,7 +31,6 @@ export const AI_MODELS = {
     modelOwner: "google",
     modelName: "nano-banana",
     type: "editor", 
-    // Запасной ID на случай сбоя API получения версий
     fallbackId: "dcg7t15fpsrmt0cvykrbg9702w",
     defaultParams: { 
         safety_filter_level: "block_only_high", 
@@ -38,7 +38,7 @@ export const AI_MODELS = {
     }
   },
 
-  // 3. Google Vertex (Быстрый, Cloud API)
+  // 3. Google Vertex
   'google-vertex': {
     provider: 'google',
     region: 'us-central1'
@@ -52,21 +52,19 @@ export async function runReplicate(modelKey, inputs) {
 
   if (!modelConfig) throw new Error(`Модель ${modelKey} не найдена`);
 
-  console.time(`⏱️ Replicate (${modelKey})`); // Засекаем время
+  console.time(`⏱️ Replicate (${modelKey})`);
   
   let finalInput = {};
   let versionId = modelConfig.id;
 
   try {
-      // === ЛОГИКА ДЛЯ IDM-VTON (ПРИМЕРКА) ===
+      // === ЛОГИКА ДЛЯ IDM-VTON ===
       if (modelConfig.type === 'vton') {
           const category = inputs.category || 'upper_body';
           
-          // 1. Умное описание (если не задано вручную)
+          // Умное описание
           const description = inputs.garment_des || DEFAULT_DESCRIPTIONS[category] || "High quality clothing";
-
-          // 2. Force DC (Dress Code) - Обязательно для платьев!
-          // Включаем строго если категория 'dresses'
+          // Force DC для платьев
           const useForceDC = category === 'dresses';
 
           finalInput = { 
@@ -78,10 +76,11 @@ export async function runReplicate(modelKey, inputs) {
           };
       } 
       
-      // === ЛОГИКА ДЛЯ NANO BANANA (РЕДАКТОР) ===
+      // === ЛОГИКА ДЛЯ NANO BANANA ===
       else if (modelConfig.type === 'editor') {
-          // 1. Агрессивный промпт (чтобы менял одежду даже на сложном фоне)
-          const prompt = `Advanced image editing. IGNORE the current clothes on the person in the first image. REPLACE them completely with the garment shown in the second image. COMPOSITE the new garment naturally onto the person's body. PRESERVE the person's face, identity, pose, and the background environment 100% exactly. High realism, 4k quality.`;
+          // 🔥 ГИБКИЙ ПРОМПТ
+          // Мы говорим: "Главная цель — надеть одежду. Фон и позу МОЖНО менять, если нужно."
+          const prompt = `Virtual Try-On task. Put the garment from the second image onto the person in the first image. PRIORITY: The clothing must look realistic and fit perfectly. You ARE ALLOWED to slightly adjust the person's pose, background, or lighting to ensure the best fit. Do not worry about preserving the background 100%. Focus on high-quality clothing transfer.`;
           
           finalInput = {
               ...modelConfig.defaultParams,
@@ -90,7 +89,7 @@ export async function runReplicate(modelKey, inputs) {
               aspect_ratio: "match_input_image"
           };
 
-          // 2. Получение ID версии (с кэшированием/фолбэком)
+          // Получение версии
           if (!versionId && modelConfig.modelOwner && modelConfig.modelName) {
               try {
                  const model = await replicate.models.get(modelConfig.modelOwner, modelConfig.modelName);
@@ -114,7 +113,7 @@ export async function runReplicate(modelKey, inputs) {
   } catch (error) {
       console.timeEnd(`⏱️ Replicate (${modelKey})`);
       console.error(`❌ Ошибка Replicate (${modelKey}):`, error);
-      throw error; // Пробрасываем ошибку выше
+      throw error; 
   }
 }
 
@@ -144,7 +143,6 @@ export async function runGoogle(personBase64, garmentBase64) {
       const client = await auth.getClient();
       const accessToken = await client.getAccessToken();
 
-      // Очистка Base64 от префиксов (на всякий случай)
       const cleanPerson = personBase64.replace(/^data:image\/\w+;base64,/, "");
       const cleanGarment = garmentBase64.replace(/^data:image\/\w+;base64,/, "");
 
@@ -168,7 +166,7 @@ export async function runGoogle(personBase64, garmentBase64) {
       const data = await response.json();
       
       if (!data.predictions?.[0]?.bytes) {
-          throw new Error("Google API вернул пустой результат (возможен Safety Filter)");
+          throw new Error("Google API вернул пустой результат");
       }
 
       console.timeEnd("⏱️ Google Vertex");
