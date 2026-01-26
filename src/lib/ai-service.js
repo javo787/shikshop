@@ -1,180 +1,224 @@
-// lib/ai-service.js
 import Replicate from "replicate";
 import { GoogleAuth } from 'google-auth-library';
 
-// --- КОНСТАНТЫ И НАСТРОЙКИ ---
-
-const DEFAULT_DESCRIPTIONS = {
-    'dresses': "A high-quality dress, full body garment, realistic fabric texture, intricate details",
-    'upper_body': "A high-quality upper body top, shirt, realistic fabric texture",
-    'lower_body': "High-quality pants or skirt, lower body garment, realistic texture"
-};
-
-// --- КОНФИГУРАЦИЯ МОДЕЛЕЙ ---
+// --- 1. КОНФИГУРАЦИЯ МОДЕЛЕЙ ---
 export const AI_MODELS = {
-  // 1. IDM-VTON (Золотой стандарт для одежды)
-  'replicate-idm-vton': {
+  // ВАРИАНТ 1: Золотой стандарт (Replicate)
+  // Самое высокое качество, но медленно и платно через Replicate
+  'idm-vton': {
+    name: "IDM-VTON (Premium)",
     provider: 'replicate',
-    // 🔥 ОБНОВЛЕННЫЙ ID (Версия, которую вы прислали)
-    id: "0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985", 
-    type: "vton",
-    defaultParams: { 
-        steps: 30, // Стандартное значение для этой версии
-        crop: false, 
-        seed: 42
-    }
-  },
-  
-  // 2. Google Nano Banana (Экспериментальный редактор)
-  'google-nano-banana': {
-    provider: 'replicate',
-    modelOwner: "google",
-    modelName: "nano-banana",
-    type: "editor", 
-    fallbackId: "dcg7t15fpsrmt0cvykrbg9702w",
-    defaultParams: { 
-        safety_filter_level: "block_only_high", 
-        output_format: "png"
-    }
+    id: "0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
+    type: "vton-standard",
+    cost: 1, 
   },
 
-  // 3. Google Vertex
-  'google-vertex': {
-    provider: 'google',
-    region: 'us-central1'
+  // ВАРИАНТ 2: Официальный Google Try-On (Vertex AI)
+  // Специализированная модель для примерки. Быстрая.
+  'google-vton': {
+    name: "Google Try-On (Speed)",
+    provider: 'google-vertex',
+    // Если virtual-try-on-exp выдаст 404, смените на virtual-try-on-001
+    modelId: 'virtual-try-on-exp', 
+    region: 'us-central1',
+    type: "vton-native",
+    cost: 1,
+  },
+
+  // ВАРИАНТ 3: Gemini 2.5 Flash Image (Nano Banana)
+  // Творческий режим: понимает промпты и может менять позу/фон
+  'gemini-flash': {
+    name: "Gemini 2.5 (Nano Banana)",
+    provider: 'google-vertex',
+    // 🔥 ТОЧНОЕ НАЗВАНИЕ НОВОЙ МОДЕЛИ ИЗ ВАШЕЙ ДОКУМЕНТАЦИИ
+    modelId: 'gemini-2.5-flash-image', 
+    region: 'us-central1',
+    type: "generative-prompt", 
+    cost: 1,
+    // Ваш промпт для "умного" редактирования
+    systemPrompt: `Request: Virtual Try-On.
+Input 1: Person. Input 2: Garment.
+Task: Generate a photorealistic image of the person from Input 1 wearing the garment from Input 2.
+Requirements:
+1. Retain the person's identity, pose, and body shape.
+2. Fit the garment naturally (folds, lighting, texture).
+3. You may slightly adjust the background or lighting to blend the garment perfectly.
+4. Output ONLY the generated image.`
   }
 };
 
-// --- ФУНКЦИЯ REPLICATE ---
-export async function runReplicate(modelKey, inputs) {
-  const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
-  const modelConfig = AI_MODELS[modelKey];
+// --- 2. ГЛАВНАЯ ФУНКЦИЯ ЗАПУСКА ---
+export async function generateTryOn(modelKey, { personImage, garmentImage, category = 'upper_body' }) {
+  // Если модель не найдена, используем Google VTON по умолчанию
+  const modelConfig = AI_MODELS[modelKey] || AI_MODELS['google-vton'];
 
-  if (!modelConfig) throw new Error(`Модель ${modelKey} не найдена`);
+  console.log(`🚀 Start AI: ${modelConfig.name} [${modelConfig.provider}]`);
 
-  console.time(`⏱️ Replicate (${modelKey})`);
-  
-  let finalInput = {};
-  let versionId = modelConfig.id;
-
-  try {
-      // === ЛОГИКА ДЛЯ IDM-VTON ===
-      if (modelConfig.type === 'vton') {
-          const category = inputs.category || 'upper_body';
-          
-          // Умное описание
-          const description = inputs.garment_des || DEFAULT_DESCRIPTIONS[category] || "High quality clothing";
-          // Force DC для платьев
-          const useForceDC = category === 'dresses';
-
-          finalInput = { 
-              ...modelConfig.defaultParams, 
-              ...inputs, 
-              garment_des: description,
-              force_dc: useForceDC,
-              category: category 
-          };
-      } 
-      
-      // === ЛОГИКА ДЛЯ NANO BANANA ===
-      else if (modelConfig.type === 'editor') {
-          // 🔥 ГИБКИЙ ПРОМПТ
-          // Мы говорим: "Главная цель — надеть одежду. Фон и позу МОЖНО менять, если нужно."
-          const prompt = `Virtual Try-On task. Put the garment from the second image onto the person in the first image. PRIORITY: The clothing must look realistic and fit perfectly. You ARE ALLOWED to slightly adjust the person's pose, background, or lighting to ensure the best fit. Do not worry about preserving the background 100%. Focus on high-quality clothing transfer.`;
-          
-          finalInput = {
-              ...modelConfig.defaultParams,
-              prompt: prompt,
-              image_input: [inputs.human_img, inputs.garm_img], 
-              aspect_ratio: "match_input_image"
-          };
-
-          // Получение версии
-          if (!versionId && modelConfig.modelOwner && modelConfig.modelName) {
-              try {
-                 const model = await replicate.models.get(modelConfig.modelOwner, modelConfig.modelName);
-                 versionId = model.latest_version.id;
-              } catch (e) {
-                 console.warn("⚠️ Не удалось получить версию Nano Banana, используем запасную.", e.message);
-                 versionId = modelConfig.fallbackId;
-              }
-          }
-      }
-
-      // === ЗАПУСК ===
-      const prediction = await replicate.predictions.create({
-        version: versionId,
-        input: finalInput
-      });
-      
-      console.timeEnd(`⏱️ Replicate (${modelKey})`);
-      return prediction;
-
-  } catch (error) {
-      console.timeEnd(`⏱️ Replicate (${modelKey})`);
-      console.error(`❌ Ошибка Replicate (${modelKey}):`, error);
-      throw error; 
+  // Роутер: выбираем движок
+  if (modelConfig.provider === 'replicate') {
+    return await _runReplicate(modelConfig, { personImage, garmentImage, category });
+  } 
+  else if (modelConfig.provider === 'google-vertex') {
+    // В Google Vertex есть два разных API:
+    // 1. Predict API (для VTON моделей)
+    // 2. GenerateContent API (для Gemini моделей)
+    if (modelConfig.type === 'vton-native') {
+        return await _runGoogleVtonNative(modelConfig, personImage, garmentImage);
+    } else {
+        return await _runGoogleGeminiPrompt(modelConfig, personImage, garmentImage);
+    }
   }
+
+  throw new Error("Unknown provider");
 }
 
-// --- ФУНКЦИЯ GOOGLE VERTEX ---
-export async function runGoogle(personBase64, garmentBase64) {
-  console.time("⏱️ Google Vertex");
+// ==========================================
+// ВНУТРЕННИЕ ФУНКЦИИ (ДВИЖКИ)
+// ==========================================
 
-  try {
-      const REGION = AI_MODELS['google-vertex'].region;
-      const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID;
-      const API_ENDPOINT = `https://${REGION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${REGION}/publishers/google/models/virtual-try-on-001:predict`;
+// --- A. REPLICATE (IDM-VTON) ---
+async function _runReplicate(config, inputs) {
+  const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
+  
+  const output = await replicate.predictions.create({
+    version: config.id,
+    input: {
+      steps: 30,
+      crop: false,
+      seed: 42,
+      category: inputs.category,
+      force_dc: inputs.category === 'dresses',
+      garm_img: inputs.garmentImage,
+      human_img: inputs.personImage,
+      garment_des: "high quality realistic clothing"
+    }
+  });
 
-      const authOptions = {
-        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-        projectId: PROJECT_ID,
-      };
+  return output; 
+}
 
-      if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-        try {
-          authOptions.credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
-        } catch (e) {
-          throw new Error("Ошибка парсинга JSON ключей Google: " + e.message);
-        }
-      }
+// --- B. GOOGLE VERTEX: NATIVE VTON (Try-On API) ---
+async function _runGoogleVtonNative(config, personBase64, garmentBase64) {
+  const auth = await _getGoogleAuth(config.region);
+  
+  const endpoint = `https://${config.region}-aiplatform.googleapis.com/v1/projects/${auth.projectId}/locations/${config.region}/publishers/google/models/${config.modelId}:predict`;
 
-      const auth = new GoogleAuth(authOptions);
-      const client = await auth.getClient();
-      const accessToken = await client.getAccessToken();
+  const pImg = personBase64.replace(/^data:image\/.+;base64,/, '');
+  const gImg = garmentBase64.replace(/^data:image\/.+;base64,/, '');
 
-      const cleanPerson = personBase64.replace(/^data:image\/\w+;base64,/, "");
-      const cleanGarment = garmentBase64.replace(/^data:image\/\w+;base64,/, "");
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      instances: [{ 
+          person_image: { bytes: pImg }, 
+          product_image: { bytes: gImg } 
+      }],
+      parameters: { seed: Math.floor(Math.random() * 1000000) }
+    })
+  });
 
-      const response = await fetch(API_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken.token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          instances: [{ person_image: { bytes: cleanPerson }, product_image: { bytes: cleanGarment } }],
-          parameters: { seed: Math.floor(Math.random() * 1000000) }
-        })
-      });
-
-      if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`Google API Error: ${response.status} ${err}`);
-      }
-
-      const data = await response.json();
-      
-      if (!data.predictions?.[0]?.bytes) {
-          throw new Error("Google API вернул пустой результат");
-      }
-
-      console.timeEnd("⏱️ Google Vertex");
-      return `data:image/png;base64,${data.predictions[0].bytes}`;
-
-  } catch (error) {
-      console.timeEnd("⏱️ Google Vertex");
-      console.error("❌ Ошибка Google Vertex:", error);
-      throw error;
+  if (!response.ok) {
+     const err = await response.text();
+     // Если экспериментальная версия недоступна, кидаем понятную ошибку
+     if (response.status === 404) {
+        throw new Error("Model not found. Try changing 'virtual-try-on-exp' to 'virtual-try-on-001' in ai-service.js");
+     }
+     throw new Error(`Google VTON Error (${response.status}): ${err}`);
   }
+
+  const data = await response.json();
+  const resultBytes = data.predictions?.[0]?.bytes;
+  
+  if (!resultBytes) throw new Error("Google VTON returned empty result");
+  
+  return { output: `data:image/png;base64,${resultBytes}`, status: 'succeeded' };
+}
+
+// --- C. GOOGLE VERTEX: GEMINI 2.5 (Nano Banana) ---
+async function _runGoogleGeminiPrompt(config, personBase64, garmentBase64) {
+  const auth = await _getGoogleAuth(config.region);
+
+  // Для Gemini используется метод :generateContent
+  const endpoint = `https://${config.region}-aiplatform.googleapis.com/v1/projects/${auth.projectId}/locations/${config.region}/publishers/google/models/${config.modelId}:generateContent`;
+
+  const pImg = personBase64.replace(/^data:image\/.+;base64,/, '');
+  const gImg = garmentBase64.replace(/^data:image\/.+;base64,/, '');
+
+  // Формируем мультимодальный запрос (Текст + 2 Картинки)
+  const requestBody = {
+    contents: [{
+      role: "user",
+      parts: [
+        { text: config.systemPrompt }, 
+        { inlineData: { mimeType: "image/jpeg", data: pImg } }, // Фото 1 (Человек)
+        { inlineData: { mimeType: "image/jpeg", data: gImg } }  // Фото 2 (Одежда)
+      ]
+    }],
+    generationConfig: {
+      temperature: 0.4,
+      // В документации указано Output token limit 32k, но для картинки важно media_resolution (если поддерживается)
+    }
+  };
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${auth.token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Gemini Error (${response.status}): ${err}`);
+  }
+
+  const data = await response.json();
+  
+  // Парсим ответ Gemini. Обычно картинка приходит как inlineData в parts.
+  const candidate = data.candidates?.[0]?.content?.parts?.[0];
+  
+  // Если модель вернула картинку (Base64)
+  if (candidate?.inlineData?.data) {
+     return { output: `data:image/png;base64,${candidate.inlineData.data}`, status: 'succeeded' };
+  }
+  
+  // Если модель вернула только текст (отказ или описание)
+  if (candidate?.text) {
+      console.warn("Gemini Response Text:", candidate.text);
+      throw new Error("Gemini вернул текст вместо фото. Возможно, сработал фильтр безопасности.");
+  }
+
+  throw new Error("Gemini не вернул корректный результат.");
+}
+
+
+// --- ВСПОМОГАТЕЛЬНАЯ: АВТОРИЗАЦИЯ GOOGLE ---
+async function _getGoogleAuth(region) {
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
+  if (!projectId) throw new Error("GOOGLE_CLOUD_PROJECT_ID not set");
+
+  const authOptions = {
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    projectId: projectId,
+  };
+
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    try {
+      authOptions.credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+    } catch (e) {
+      throw new Error("Invalid JSON in GOOGLE_SERVICE_ACCOUNT_KEY");
+    }
+  }
+
+  const auth = new GoogleAuth(authOptions);
+  const client = await auth.getClient();
+  const token = await client.getAccessToken();
+  
+  return { token: token.token, projectId };
 }
