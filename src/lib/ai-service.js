@@ -5,7 +5,7 @@ import { GoogleAuth } from 'google-auth-library';
 // 1. КОНФИГУРАЦИЯ МОДЕЛЕЙ
 // ==============================================================================
 export const AI_MODELS = {
-  // 1. REPLICATE
+  // 1. REPLICATE (IDM-VTON)
   'replicate-idm-vton': {
     name: "IDM-VTON (Premium)",
     provider: 'replicate',
@@ -19,7 +19,7 @@ export const AI_MODELS = {
     type: "vton-standard",
   },
 
-  // 2. GOOGLE VERTEX (VTON)
+  // 2. GOOGLE VERTEX (VTON NATIVE)
   'google-vertex': {
     name: "Google Try-On (Speed)",
     provider: 'google-vertex',
@@ -35,34 +35,44 @@ export const AI_MODELS = {
     type: "vton-native",
   },
 
-  // 3. GEMINI 2.5 (NANO BANANA)
+  // 3. GEMINI 2.5 (NANO BANANA) - SUPER CHARGED CONFIG
   'google-nano-banana': {
     name: "Gemini 2.5 (Nano Banana)",
     provider: 'google-vertex',
     modelId: 'gemini-2.5-flash-image', 
     region: 'us-central1',
     type: "generative-prompt", 
-    systemPrompt: `Request: Virtual Try-On.
-Input 1: Person. Input 2: Garment.
-Task: Generate a photorealistic image of the person from Input 1 wearing the garment from Input 2.
-Requirements:
-1. Retain the person's identity, pose, and body shape.
-2. Fit the garment naturally (folds, lighting, texture).
-3. Output ONLY the generated image.`
+    // 🔥 МОЩНЫЙ ПРОМПТ ДЛЯ РЕДАКТИРОВАНИЯ
+    systemPrompt: `
+      Role: Professional Virtual Try-On AI Specialist.
+      Task: Edit the input image (Image 1) to make the person wear the garment from Image 2.
+
+      [INPUTS]
+      - Image 1: Target Person (Keep their face, pose, body shape, and background EXACTLY as is).
+      - Image 2: Garment Reference (Use the texture, fabric, logos, and shape from this image).
+
+      [STRICT GUIDELINES]
+      1. IDENTITY PRESERVATION: Do NOT change the person's face, hair, or skin tone.
+      2. REALISM: The garment must fold naturally around the body. Match lighting and shadows of Image 1.
+      3. FIT: Ensure the garment fits the body shape defined in Image 1.
+      4. OUTPUT: Return ONLY the final photorealistic image. No explanations.
+    `
   },
-  'gemini-flash': { // Алиас
+  'gemini-flash': { // Алиас с тем же промптом
     name: "Gemini 2.5 (Nano Banana)",
     provider: 'google-vertex',
     modelId: 'gemini-2.5-flash-image', 
     region: 'us-central1',
     type: "generative-prompt",
-    systemPrompt: `Request: Virtual Try-On.
-Input 1: Person. Input 2: Garment.
-Task: Generate a photorealistic image of the person from Input 1 wearing the garment from Input 2.
-Requirements:
-1. Retain the person's identity, pose, and body shape.
-2. Fit the garment naturally (folds, lighting, texture).
-3. Output ONLY the generated image.`
+    systemPrompt: `
+      Role: Professional Virtual Try-On AI Specialist.
+      Task: Edit the input image (Image 1) to make the person wear the garment from Image 2.
+      
+      [STRICT GUIDELINES]
+      1. IDENTITY PRESERVATION: Do NOT change the person's face, hair, or skin tone.
+      2. REALISM: The garment must fold naturally around the body. Match lighting and shadows.
+      3. OUTPUT: Return ONLY the final photorealistic image.
+    `
   }
 };
 
@@ -80,13 +90,14 @@ export async function generateTryOn(modelKey, { personImage, garmentImage, categ
     if (modelKey && modelKey.includes('banana')) modelConfig = AI_MODELS['google-nano-banana'];
     else if (modelKey && modelKey.includes('google')) modelConfig = AI_MODELS['google-vertex'];
     
+    // Если совсем ничего не нашли — Replicate
     if (!modelConfig) {
         console.warn(`⚠️ [AI-SERVICE] Переключаемся на запасную: replicate-idm-vton`);
         modelConfig = AI_MODELS['replicate-idm-vton'];
     }
   }
 
-  console.log(`✅ [AI-SERVICE] Выбрана: ${modelConfig.name}`);
+  console.log(`✅ [AI-SERVICE] Выбрана: ${modelConfig.name} [${modelConfig.provider}]`);
 
   try {
     if (modelConfig.provider === 'replicate') {
@@ -116,7 +127,7 @@ async function _ensureBase64(input) {
   
   // 1. Если это ссылка (http/https) — скачиваем
   if (input.startsWith('http') || input.startsWith('https')) {
-      console.log(`⬇️ [AI-SERVICE] Скачивание картинки: ${input.substring(0, 40)}...`);
+      console.log(`⬇️ [AI-SERVICE] Скачивание картинки: ${input.substring(0, 30)}...`);
       try {
         const response = await fetch(input);
         if (!response.ok) throw new Error(`Не удалось скачать картинку: ${response.status}`);
@@ -135,7 +146,6 @@ async function _ensureBase64(input) {
 
 // --- ДВИЖОК A: REPLICATE ---
 async function _runReplicate(config, inputs) {
-  // Replicate умеет работать со ссылками, конвертация не обязательна, но допустима
   console.log(`🔄 [REPLICATE] Запуск...`);
   const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
   
@@ -160,11 +170,10 @@ async function _runReplicate(config, inputs) {
   }
 }
 
-// --- ДВИЖОК B: GOOGLE VTON ---
+// --- ДВИЖОК B: GOOGLE VTON (Native) ---
 async function _runGoogleVtonNative(config, personInput, garmentInput) {
   console.log(`🔄 [GOOGLE-VTON] Подготовка...`);
   
-  // 🔥 КОНВЕРТИРУЕМ В BASE64 (ОБЯЗАТЕЛЬНО)
   const pImg = await _ensureBase64(personInput);
   const gImg = await _ensureBase64(garmentInput);
 
@@ -202,17 +211,24 @@ async function _runGoogleVtonNative(config, personInput, garmentInput) {
   return { output: `data:image/png;base64,${resultBytes}`, status: 'succeeded' };
 }
 
-// --- ДВИЖОК C: GOOGLE GEMINI ---
+// --- ДВИЖОК C: GOOGLE GEMINI (MAXIMUM POWER) ---
 async function _runGoogleGeminiPrompt(config, personInput, garmentInput) {
-  console.log(`🔄 [GEMINI] Подготовка...`);
+  console.log(`🔄 [GEMINI] Подготовка (Flash Image 2.5)...`);
 
-  // 🔥 КОНВЕРТИРУЕМ В BASE64 (ОБЯЗАТЕЛЬНО ДЛЯ GEMINI)
   const pImg = await _ensureBase64(personInput);
   const gImg = await _ensureBase64(garmentInput);
 
   const auth = await _getGoogleAuth(config.region);
   const endpoint = `https://${config.region}-aiplatform.googleapis.com/v1/projects/${auth.projectId}/locations/${config.region}/publishers/google/models/${config.modelId}:generateContent`;
   
+  // 🔥 НАСТРОЙКИ БЕЗОПАСНОСТИ (Чтобы не блокировало манекены)
+  const safetySettings = [
+    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+  ];
+
   console.time("⏱️ Gemini");
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -229,10 +245,15 @@ async function _runGoogleGeminiPrompt(config, personInput, garmentInput) {
           { inlineData: { mimeType: "image/jpeg", data: gImg } }
         ]
       }],
+      // 🔥 ТОНКИЕ НАСТРОЙКИ ГЕНЕРАЦИИ
       generationConfig: { 
-          temperature: 0.4,
-          maxOutputTokens: 2048 
-      }
+          temperature: 0.2, // Меньше фантазии, больше точности
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+          candidateCount: 1 
+      },
+      safetySettings: safetySettings
     })
   });
   console.timeEnd("⏱️ Gemini");
@@ -240,20 +261,36 @@ async function _runGoogleGeminiPrompt(config, personInput, garmentInput) {
   if (!response.ok) {
     const errText = await response.text();
     if (response.status === 429) throw new Error(`Лимиты Gemini исчерпаны (429).`);
+    // Обработка Safety Filter на уровне HTTP
+    if (response.status === 400 && errText.includes("safety")) throw new Error("Google Safety Filter заблокировал запрос.");
     throw new Error(`Gemini Error (${response.status}): ${errText}`);
   }
 
   const data = await response.json();
-  const candidate = data.candidates?.[0]?.content?.parts?.[0];
-
-  if (candidate?.inlineData?.data) {
-     return { output: `data:image/png;base64,${candidate.inlineData.data}`, status: 'succeeded' };
-  }
-  if (candidate?.text) {
-      throw new Error(`Gemini не нарисовал фото, а ответил текстом: ${candidate.text}`);
+  
+  // Проверка на блокировку промпта
+  if (data.promptFeedback?.blockReason) {
+      throw new Error(`Запрос заблокирован (Safety): ${data.promptFeedback.blockReason}`);
   }
 
-  throw new Error("Gemini вернул некорректный ответ.");
+  const candidate = data.candidates?.[0];
+
+  // Проверка на блокировку ответа
+  if (candidate?.finishReason === "SAFETY") {
+      throw new Error("Генерация остановлена фильтром безопасности.");
+  }
+
+  // Успешная картинка
+  if (candidate?.content?.parts?.[0]?.inlineData?.data) {
+     return { output: `data:image/png;base64,${candidate.content.parts[0].inlineData.data}`, status: 'succeeded' };
+  }
+  
+  // Ответ текстом (ошибка модели)
+  if (candidate?.content?.parts?.[0]?.text) {
+      throw new Error(`Gemini ответил текстом вместо фото: "${candidate.content.parts[0].text.substring(0, 50)}..."`);
+  }
+
+  throw new Error("Gemini вернул пустой результат.");
 }
 
 // --- АВТОРИЗАЦИЯ ---
@@ -278,4 +315,4 @@ async function _getGoogleAuth(region) {
   const client = await auth.getClient();
   const token = await client.getAccessToken();
   return { token: token.token, projectId };
-}
+}                                                                         
