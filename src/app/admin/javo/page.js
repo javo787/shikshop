@@ -1,3 +1,4 @@
+// C:\shikshop\src\app\admin\javo\page.js
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,21 +9,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import ImageUpload from '../../../components/ImageUpload';
 
-// 🛠️ КОНФИГУРАЦИЯ КАТЕГОРИЙ
-const CLOTHING_CATEGORIES = [
-  { label: '👗 Длинное платье', value: 'long_dress', aiType: 'dresses' },
-  { label: '👗 Короткое платье', value: 'short_dress', aiType: 'dresses' },
-  { label: '🧥 Пальто / Тренч', value: 'coat', aiType: 'dresses' }, 
-  { label: '🧥 Шуба (Длинная)', value: 'fur_coat_long', aiType: 'dresses' },
-  { label: '🧥 Шуба (Короткая / Автоледи)', value: 'fur_coat_short', aiType: 'upper_body' },
-  { label: '🧥 Пуховик (Длинный)', value: 'puffer_long', aiType: 'dresses' },
-  { label: '🧥 Пуховик / Куртка (Короткие)', value: 'jacket', aiType: 'upper_body' },
-  { label: '👔 Пиджак / Жакет', value: 'blazer', aiType: 'upper_body' },
-  { label: '👕 Блузка / Рубашка', value: 'shirt', aiType: 'upper_body' },
-  { label: '👘 Костюм (Цельный/Комбинезон)', value: 'jumpsuit', aiType: 'dresses' },
-  { label: '👖 Юбка', value: 'skirt', aiType: 'lower_body' },
-  { label: '👖 Брюки / Джинсы', value: 'pants', aiType: 'lower_body' },
-];
+// Импортируем вынесенные части
+import { CLOTHING_CATEGORIES } from './constants';
+import { getImageUrl, compressImage } from './utils';
 
 export default function AdminProducts() {
   // --- STATE: Основные данные ---
@@ -103,12 +92,7 @@ export default function AdminProducts() {
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
-  const getImageUrl = (img) => {
-    if (!img) return '/images/placeholder.jpg';
-    return img.startsWith('http') ? img : `/api/images/${img}`;
-  };
-
-  // 🔥 ФУНКЦИЯ ГЕНЕРАЦИИ ЧЕРЕЗ AI (GEMINI)
+  // 🔥 ИСПРАВЛЕННАЯ ФУНКЦИЯ ГЕНЕРАЦИИ (С СЖАТИЕМ)
   const handleGenerateAI = async () => {
     if (!image) {
         alert("Сначала загрузите главное фото (обложку)!");
@@ -119,23 +103,23 @@ export default function AdminProducts() {
         setIsGenerating(true);
         setError(null);
 
-        // 1. Конвертируем URL картинки в Base64
+        // 1. Сжимаем картинку перед отправкой
         const imageUrl = getImageUrl(image);
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
+        let base64;
         
-        const base64 = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-        });
+        try {
+            base64 = await compressImage(imageUrl);
+        } catch (imgErr) {
+            console.error("Ошибка сжатия:", imgErr);
+            throw new Error("Не удалось обработать изображение. Проверьте, доступна ли ссылка.");
+        }
 
-        // 2. Собираем то, что вы уже написали в поля (контекст для AI)
+        // 2. Собираем контекст
         const currentData = {
             name,
             description,
             material,
-            details // если есть детали, тоже отправим
+            details 
         };
 
         // 3. Отправляем в API
@@ -146,8 +130,15 @@ export default function AdminProducts() {
         });
 
         if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.error || 'Ошибка генерации');
+            const errText = await res.text();
+            let errMsg = 'Ошибка генерации';
+            try {
+                const jsonErr = JSON.parse(errText);
+                errMsg = jsonErr.error || errMsg;
+            } catch (e) {
+                errMsg = `Ошибка сервера: ${res.status} ${res.statusText}`; 
+            }
+            throw new Error(errMsg);
         }
         
         const data = await res.json();
@@ -158,7 +149,6 @@ export default function AdminProducts() {
         if (data.material) setMaterial(data.material);
         if (data.details) setDetails(data.details);
         
-        // Если AI уверенно определил категорию, меняем её
         if (data.category) {
              const found = CLOTHING_CATEGORIES.find(c => c.value === data.category);
              if (found) {
@@ -174,7 +164,7 @@ export default function AdminProducts() {
 
     } catch (err) {
         console.error(err);
-        setError("Не удалось сгенерировать описание. Проверьте консоль.");
+        setError(err.message || "Не удалось сгенерировать описание.");
     } finally {
         setIsGenerating(false);
     }
@@ -186,7 +176,6 @@ export default function AdminProducts() {
     setError(null);
     setSuccess(null);
 
-    // Важно: берем первое фото из массива для совместимости со старыми версиями
     const primaryTryOn = tryOnImages.length > 0 ? tryOnImages[0] : image;
 
     const productData = {
@@ -239,7 +228,6 @@ export default function AdminProducts() {
     setImageLarge(product.imageLarge || '');
     setAdditionalImages(product.additionalImages || []);
     
-    // Миграция старых данных: если есть только tryOnImage, превращаем его в массив
     if (product.tryOnImages && product.tryOnImages.length > 0) {
         setTryOnImages(product.tryOnImages);
     } else if (product.tryOnImage) {
