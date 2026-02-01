@@ -8,6 +8,8 @@ import Icon from '@/components/Icon';
 // 👇 Импорты для связи с профилем
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+// 👇 Наш новый компонент
+import PhoneLogin from '@/components/PhoneLogin';
 
 export default function CartClient() {
   const { cart, removeFromCart, updateQuantity, clearCart } = useCart();
@@ -22,6 +24,9 @@ export default function CartClient() {
   // 👇 Состояние для пользователя
   const [user, setUser] = useState(null); // Firebase User
   const [dbUser, setDbUser] = useState(null); // MongoDB User (с данными из базы)
+  
+  // 👇 Состояние модального окна входа
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // 1. ПРИ ЗАГРУЗКЕ: Проверяем, кто вошел, и подтягиваем данные
   useEffect(() => {
@@ -36,10 +41,10 @@ export default function CartClient() {
             setDbUser(data);
             
             // АВТОЗАПОЛНЕНИЕ: Если в профиле есть данные, ставим их в форму
-            // Если пользователь уже начал что-то писать (prev), не стираем это
+            // Если телефона нет в базе, берем из Firebase Auth (currentUser.phoneNumber)
             setFormData(prev => ({
               name: data.name || prev.name || '',
-              phone: data.phone || prev.phone || '',
+              phone: data.phone || currentUser.phoneNumber || prev.phone || '',
               address: data.address || prev.address || '',
             }));
           }
@@ -76,6 +81,12 @@ export default function CartClient() {
     setBuyNowItem(null);
   };
 
+  // Обработка успешного входа через модалку
+  const handleLoginSuccess = () => {
+    setShowLoginModal(false);
+    // Данные подтянутся автоматически благодаря useEffect выше (onAuthStateChanged сработает сам)
+  };
+
   const handleOrderSubmit = async (e) => {
     e.preventDefault();
     setOrderStatus('loading');
@@ -87,9 +98,9 @@ export default function CartClient() {
         body: JSON.stringify({
           items: itemsToCheckout,
           totalAmount: finalTotal,
-          shippingAddress: formData, // Отправляем данные из формы (даже если пользователь их изменил)
+          shippingAddress: formData, // Отправляем данные из формы
           paymentMethod: 'cash_on_delivery',
-          // 👇 ВАЖНО: Привязываем заказ к ID пользователя (если он есть)
+          // 👇 ВАЖНО: Если юзер есть - пишем ID, если нет - 'Guest'
           userId: dbUser?._id || 'Guest' 
         }),
       });
@@ -137,7 +148,7 @@ export default function CartClient() {
   }
 
   return (
-    <div className="container mx-auto px-0 md:px-4 py-6 md:py-8">
+    <div className="container mx-auto px-0 md:px-4 py-6 md:py-8 relative">
       <h1 className="text-2xl md:text-3xl font-serif font-bold text-dark-teal dark:text-white mb-6 md:mb-8 px-4 md:px-0">
         {isCheckingOut 
           ? (buyNowItem ? 'Оформление товара' : 'Оформление заказа') 
@@ -242,6 +253,22 @@ export default function CartClient() {
               </button>
             ) : (
               <form onSubmit={handleOrderSubmit} className="space-y-4 animate-fadeIn">
+                
+                {/* 🔥 НОВЫЙ БЛОК: Предложение войти */}
+                {!user && (
+                  <div className="bg-primary-pink/10 border border-primary-pink/30 rounded-xl p-4 mb-4 text-center">
+                    <p className="text-sm text-dark-teal dark:text-white mb-2">Уже есть аккаунт?</p>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowLoginModal(true)}
+                      className="text-sm font-bold text-accent-rose hover:text-dark-teal underline transition-colors"
+                    >
+                      Войти по номеру телефона
+                    </button>
+                    <p className="text-xs text-gray-400 mt-1">Данные заполнятся автоматически</p>
+                  </div>
+                )}
+
                 <div>
                     <label className="text-xs font-bold text-gray-500 uppercase ml-1 mb-1 block">Ваше имя</label>
                     <input 
@@ -294,6 +321,17 @@ export default function CartClient() {
           </div>
         </div>
       </div>
+
+      {/* 🔥 МОДАЛЬНОЕ ОКНО ВХОДА */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn">
+          <PhoneLogin 
+            onClose={() => setShowLoginModal(false)}
+            onSuccess={handleLoginSuccess}
+          />
+        </div>
+      )}
+
     </div>
   );
 }
