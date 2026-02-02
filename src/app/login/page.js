@@ -150,23 +150,21 @@ export default function LoginPage() {
                 <span>Google</span>
             </button>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-               {/* Phone */}
-               <button 
-                  type="button" onClick={() => setShowPhoneLogin(true)}
-                  className="flex items-center justify-center gap-2 p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200 font-medium"
-               >
-                  <PhoneIcon />
-                  <span>Телефон</span>
-               </button>
+            {/* ... внутри login/page.js ... */}
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   <button 
+      type="button" 
+      onClick={() => setShowPhoneLogin(true)}
+      className="flex items-center justify-center gap-2 p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-200 font-medium h-[48px]"
+   >
+      <PhoneIcon />
+      <span>Телефон</span>
+   </button>
 
-               {/* Telegram (Виджет внутри кнопки не работает, поэтому это контейнер для виджета или своя кнопка) */}
-               {/* Если виджет TelegramLoginButton рендерит саму кнопку, просто вставляем его. 
-                   Для красоты можно обернуть в div с фиксированной высотой */}
-               <div className="flex items-center justify-center rounded-xl border border-gray-200 dark:border-white/10 bg-[#54a9eb]/10 overflow-hidden h-[50px]">
-                   <TelegramLoginButton onSuccess={handleAlternativeSuccess} />
-               </div>
-            </div>
+   <div className="flex items-center justify-center h-[48px]">
+       <TelegramLoginButton onSuccess={handleAlternativeSuccess} />
+   </div>
+</div>
          </div>
 
          <p className="text-center mt-6 text-gray-500 text-sm">
