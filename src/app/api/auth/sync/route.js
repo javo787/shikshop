@@ -4,41 +4,60 @@ import User from '@/models/User';
 
 export async function POST(req) {
   try {
-    const { uid, phone } = await req.json();
+    // Получаем все возможные данные (email и name могут быть null)
+    const { uid, phone, email, name } = await req.json();
     
-    if (!uid || !phone) {
-      return NextResponse.json({ error: 'Missing data' }, { status: 400 });
+    if (!uid) {
+      return NextResponse.json({ error: 'Missing UID' }, { status: 400 });
     }
 
     await connectMongoDB();
 
-    // 1. Ищем пользователя по UID Firebase
+    // 1. Ищем пользователя по UID
     let user = await User.findOne({ firebaseUid: uid });
 
     if (!user) {
-      // 2. Если не нашли по UID, ищем по телефону (вдруг админ создал его вручную или был старый заказ)
-      user = await User.findOne({ phone: phone });
+      // 2. Если не нашли по UID, ищем по телефону (если он передан)
+      if (phone) {
+        user = await User.findOne({ phone: phone });
+      }
+      
+      // 3. Или по email (если он передан)
+      if (!user && email) {
+        user = await User.findOne({ email: email });
+      }
 
       if (user) {
-        // Нашли по телефону -> обновляем UID, чтобы связать аккаунты
+        // --- СЦЕНАРИЙ: ПОЛЬЗОВАТЕЛЬ НАЙДЕН (ОБНОВЛЯЕМ) ---
         user.firebaseUid = uid;
+        // Обновляем поля, только если они пришли новые и в базе пусто
+        if (phone && !user.phone) user.phone = phone;
+        if (email && !user.email) user.email = email;
+        if (name && !user.name) user.name = name;
+        
         await user.save();
       } else {
-        // 3. Совсем новый пользователь -> создаем
-        user = await User.create({
+        // --- СЦЕНАРИЙ: НОВЫЙ ПОЛЬЗОВАТЕЛЬ (СОЗДАЕМ) ---
+        // Формируем объект динамически. НЕЛЬЗЯ писать email: ''
+        const newUserObj = {
           firebaseUid: uid,
-          phone: phone,
-          name: '', // Имя клиент заполнит в корзине
-          email: '', 
           role: 'user',
-          address: ''
-        });
+          address: '',
+          image: '',
+          favorites: []
+        };
+
+        if (phone) newUserObj.phone = phone;
+        if (email) newUserObj.email = email; // Добавится только если email существует
+        if (name) newUserObj.name = name;
+
+        user = await User.create(newUserObj);
       }
     }
 
     return NextResponse.json({ success: true, user });
   } catch (error) {
     console.error('Auth Sync Error:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

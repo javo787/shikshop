@@ -6,24 +6,36 @@ const UserSchema = new mongoose.Schema({
     type: String, 
     required: true, 
     unique: true,
-    index: true // Индекс для быстрого поиска при входе
+    index: true 
   },
   
   // Основные данные
-  email: { type: String, required: true },
+  // 👇 ИЗМЕНЕНИЕ: Убрали required: true, добавили sparse: true
+  email: { 
+    type: String, 
+    required: false, 
+    unique: true, 
+    sparse: true // Разрешает иметь пользователей БЕЗ email
+  },
   name: { type: String },
   
-  // ВАЖНО: Поле для хранения ссылки на аватар
+  // Аватар
   image: { 
     type: String,
     default: '' 
   },
 
   // Контакты
-  phone: { type: String },
+  // 👇 ИЗМЕНЕНИЕ: Тоже добавляем sparse, чтобы не было ошибок дубликатов
+  phone: { 
+    type: String,
+    required: false,
+    unique: true,
+    sparse: true
+  },
   address: { type: String },
 
-  // Дополнительная анкета (для будущих скидок и аналитики)
+  // Дополнительная анкета
   gender: { 
     type: String, 
     enum: ['male', 'female', 'other'],
@@ -31,14 +43,20 @@ const UserSchema = new mongoose.Schema({
   },
   birthDate: { type: Date },
 
-  // Избранное (храним ID товаров)
+  // Избранное
   favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
 
-  // Роль пользователя (admin или user)
+  // Роль
   role: { type: String, default: 'user' },
   
-  createdAt: { type: Date, default: Date.now },
-});
+  // Telegram provider (для будущего)
+  providers: {
+    telegram: {
+      id: String,
+      username: String,
+      photoUrl: String
+    }
+  }
+}, { timestamps: true });
 
-// Проверка, чтобы не компилировать модель дважды при горячей перезагрузке Next.js
 export default mongoose.models.User || mongoose.model('User', UserSchema);
