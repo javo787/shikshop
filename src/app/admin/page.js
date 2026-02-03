@@ -72,6 +72,11 @@ export default function Admin() {
             <span className="font-bold text-dark-teal">Блог</span>
           </Link>
 
+         <Link href="/admin/newsletter" className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col items-center justify-center text-center group">
+            <span className="text-4xl mb-2 group-hover:scale-110 transition-transform"></span>
+            <span className="font-bold text-dark-teal">Рассылка</span>
+          </Link>
+
            <Link href="/admin/analytics" className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col items-center justify-center text-center group">
             <span className="text-4xl mb-2 group-hover:scale-110 transition-transform">�👗</span>
             <span className="font-bold text-dark-teal">Примерка</span>
