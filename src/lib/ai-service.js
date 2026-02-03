@@ -198,8 +198,8 @@ async function _runGoogleVtonNative(config, personInput, garmentInput) {
           }] 
       }],
       parameters: { 
-          sampleCount: 1,
-          seed: Math.floor(Math.random() * 1000000) 
+          sampleCount: 1
+          // seed: удален, так как включен watermark (вызывал ошибку 400)
       }
     })
   });
