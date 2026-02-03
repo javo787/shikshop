@@ -9,6 +9,7 @@ import AOSInitializer from '@/components/AOSInitializer';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
 import { FavoritesProvider } from '@/context/FavoritesContext'; 
 import { CartProvider } from '@/context/CartContext';
+import NextTopLoader from 'nextjs-toploader'; // <--- 1. Импорт загрузчика
 import '@/styles/globals.css';
 
 const inter = Inter({
@@ -64,6 +65,20 @@ export default async function RootLayout({ children }) {
       <body className="bg-bg-light dark:bg-dark-teal font-sans flex flex-col min-h-screen">
         {/* Google Analytics */}
         <GoogleAnalytics GA_MEASUREMENT_ID="G-QGF9MP9P5S" />
+
+        {/* 👇 2. Компонент загрузки (Progress Bar) */}
+        <NextTopLoader 
+          color="#ff7f50"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          height={3}
+          crawl={true}
+          showSpinner={false}
+          easing="ease"
+          speed={200}
+          shadow="0 0 10px #ff7f50,0 0 5px #ff7f50"
+          zIndex={1600}
+        />
 
         <NextIntlClientProvider locale={locale} messages={messages}>
           <CartProvider>

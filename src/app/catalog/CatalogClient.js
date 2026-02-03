@@ -383,7 +383,7 @@ export default function CatalogClient() {
               </div>
             )}
             <p className="text-lg font-semibold text-text-dark mb-2">
-              {selectedProduct.price ? `${selectedProduct.price} ₽` : 'Цена не указана'}
+              {selectedProduct.price ? `${selectedProduct.price} смн` : 'Цена не указана'}
             </p>
             <p className="text-text-gray mb-4">
               {selectedProduct.description || 'Описание отсутствует'}

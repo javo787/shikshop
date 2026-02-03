@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import Icon from './Icon';
@@ -7,6 +8,41 @@ import Icon from './Icon';
 export default function Footer() {
   // Используем пространство имен 'home', так как в вашем словаре переводы футера лежат там
   const t = useTranslations('home');
+
+  // Состояния для формы подписки
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState(''); // 'loading', 'success', 'error', ''
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    if (!email) return;
+    
+    setStatus('loading');
+    try {
+        const res = await fetch('/api/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+            setStatus('success');
+            setEmail('');
+            alert(data.message || 'Вы успешно подписались!'); 
+        } else {
+            setStatus('error');
+            alert(data.error || 'Ошибка подписки');
+        }
+    } catch (error) {
+        setStatus('error');
+        console.error('Ошибка при подписке:', error);
+        alert('Произошла ошибка при отправке данных');
+    } finally {
+        setStatus('');
+    }
+  };
 
   return (
     <footer className="bg-dark-teal text-white pt-16 pb-8 border-t border-white/10">
@@ -23,14 +59,21 @@ export default function Footer() {
             <p className="mb-4 text-gray-300 text-sm font-light">
               Узнавайте о новинках и закрытых распродажах первыми.
             </p>
-            <form className="flex flex-col gap-3" onSubmit={(e) => e.preventDefault()}>
+            <form className="flex flex-col gap-3" onSubmit={handleSubscribe}>
               <input
                 type="email"
                 placeholder={t('footerSubscribePlaceholder')}
-                className="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-primary-pink transition-colors"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={status === 'loading'}
+                className="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:border-primary-pink transition-colors disabled:opacity-50"
               />
-              <button className="btn w-full md:w-auto">
-                {t('footerSubscribeButton')}
+              <button 
+                type="submit"
+                disabled={status === 'loading'}
+                className="btn w-full md:w-auto disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {status === 'loading' ? 'Обработка...' : t('footerSubscribeButton')}
               </button>
             </form>
           </div>

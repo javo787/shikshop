@@ -139,3 +139,21 @@ body {
     justify-content: center;
   }
 }
+
+/* --- ГЛОБАЛЬНЫЙ UX (Эффект нажатия) --- */
+@layer utilities {
+  .active-press:active {
+    @apply transform scale-95 opacity-80 transition-transform duration-100;
+  }
+}
+
+/* Автоматический эффект для всех кнопок и ссылок */
+a:active, button:active {
+  transform: scale(0.97);
+  transition: transform 0.1s ease-in-out;
+}
+
+/* Исключение для логотипа, чтобы он не прыгал (если нужно) */
+h1 a:active {
+  transform: none;
+}
