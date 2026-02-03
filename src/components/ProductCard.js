@@ -3,35 +3,21 @@
 import Link from 'next/link';
 import ClientImage from './ClientImage';
 import Icon from './Icon';
-import { useFavorites } from '@/context/FavoritesContext'; // <--- Импорт
+import FavoriteButton from './FavoriteButton'; // <--- Импорт нового компонента
 
 export default function ProductCard({ product, onQuickView }) {
-  const { isFavorite, toggleFavorite } = useFavorites(); // <--- Хук
-
   if (!product || !product._id) {
     return <div className="text-red-500 text-center py-4 text-xs">Товар недоступен</div>;
   }
 
   const displayImage = product.imageLarge || product.image || (product.additionalImages && product.additionalImages[0]) || '/images/placeholder.jpg';
-  const liked = isFavorite(product._id); // Проверяем, лайкнут ли
 
   return (
     <div className="group card-premium relative flex flex-col h-full">
-      {/* КНОПКА ЛАЙКА */}
-      <button
-        onClick={(e) => {
-          e.preventDefault(); 
-          toggleFavorite(product._id);
-        }}
-        className={`absolute top-3 right-3 z-20 p-2 rounded-full shadow-md transition-all duration-300 ${
-          liked 
-            ? 'bg-accent-rose text-white scale-110' 
-            : 'bg-white/80 text-gray-400 hover:text-accent-rose hover:bg-white'
-        }`}
-        aria-label="В избранное"
-      >
-        <Icon name="heart" className={`w-5 h-5 ${liked ? 'fill-current' : ''}`} />
-      </button>
+      {/* НОВАЯ КНОПКА ЛАЙКА (Прозрачная с тенью) */}
+      <div className="absolute top-3 right-3 z-20">
+        <FavoriteButton productId={product._id} />
+      </div>
 
       <Link
         href={`/product/${product._id}`}
