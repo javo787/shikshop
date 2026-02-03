@@ -30,7 +30,6 @@ export async function connectMongoDB() {
       throw new Error('MONGODB_URI не указан в .env.local');
     }
 
-    console.log('URI используется:', process.env.MONGODB_URI.substring(0, 50) + '...');
     console.log('Подключение к MongoDB...');
     conn = await mongoose.connect(process.env.MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,

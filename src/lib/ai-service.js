@@ -187,12 +187,20 @@ async function _runGoogleVtonNative(config, personInput, garmentInput) {
       'Authorization': `Bearer ${auth.token}`,
       'Content-Type': 'application/json'
     },
+    // 🔥 ИСПРАВЛЕННАЯ СТРУКТУРА ДЛЯ virtual-try-on-001
     body: JSON.stringify({
       instances: [{ 
-          person_image: { bytes: pImg }, 
-          product_image: { bytes: gImg } 
+          personImage: { 
+            image: { bytesBase64Encoded: pImg } 
+          }, 
+          productImages: [{ 
+            image: { bytesBase64Encoded: gImg } 
+          }] 
       }],
-      parameters: { seed: Math.floor(Math.random() * 1000000) }
+      parameters: { 
+          sampleCount: 1,
+          seed: Math.floor(Math.random() * 1000000) 
+      }
     })
   });
   console.timeEnd("⏱️ GoogleVton");
@@ -205,8 +213,14 @@ async function _runGoogleVtonNative(config, personInput, garmentInput) {
   }
 
   const data = await response.json();
-  const resultBytes = data.predictions?.[0]?.bytes;
-  if (!resultBytes) throw new Error("Google VTON вернул пустой результат");
+  
+  // Получаем байты из нового поля
+  const resultBytes = data.predictions?.[0]?.bytesBase64Encoded;
+  
+  if (!resultBytes) {
+      console.error("❌ Google VTON Response:", JSON.stringify(data, null, 2));
+      throw new Error("Google VTON вернул пустой результат");
+  }
 
   return { output: `data:image/png;base64,${resultBytes}`, status: 'succeeded' };
 }
@@ -315,4 +329,4 @@ async function _getGoogleAuth(region) {
   const client = await auth.getClient();
   const token = await client.getAccessToken();
   return { token: token.token, projectId };
-}                                                                         
+}
