@@ -9,9 +9,34 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// 1. Функция отправки результата клиенту
+// 1. УНИВЕРСАЛЬНАЯ ФУНКЦИЯ (Нужна для рассылки)
+export async function sendEmail({ to, subject, html }) {
+  const mailOptions = {
+    from: '"PARIZOD" <' + process.env.GMAIL_USER + '>',
+    to: to,
+    subject: subject,
+    html: html,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Письмо отправлено: ${to}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Ошибка отправки письма:', error);
+    throw error;
+  }
+}
+
+// 2. Функция отправки результата клиенту (С ИСПРАВЛЕНИЕМ КАРТИНОК)
 export async function sendClientResultEmail({ email, userName, resultUrl, productLink, productName }) {
   if (!email) return;
+
+  // Проверяем, является ли картинка Base64 строкой
+  const isBase64 = resultUrl && resultUrl.startsWith('data:');
+  
+  // Если Base64 -> используем CID, если ссылка -> оставляем ссылку
+  const imageSrc = isBase64 ? 'cid:tryonresult' : resultUrl;
 
   const mailOptions = {
     from: '"PARIZOD AI" <' + process.env.GMAIL_USER + '>',
@@ -23,8 +48,8 @@ export async function sendClientResultEmail({ email, userName, resultUrl, produc
         <p>Привет, ${userName || 'Гость'}! ✨</p>
         <p>Нейросеть завершила примерку. Вот что у нас получилось:</p>
         
-        <div style="margin: 20px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-          <img src="${resultUrl}" alt="Результат" style="width: 100%; height: auto; display: block;" />
+        <div style="margin: 20px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); background-color: #fff;">
+          <img src="${imageSrc}" alt="Результат" style="width: 100%; height: auto; display: block;" />
         </div>
 
         <div style="text-align: center; margin-top: 30px;">
@@ -36,7 +61,14 @@ export async function sendClientResultEmail({ email, userName, resultUrl, produc
           <a href="https://shikshop.vercel.app" style="color: #666; font-size: 14px;">Попробовать еще раз</a>
         </div>
       </div>
-    `
+    `,
+    attachments: isBase64 ? [
+        {
+            filename: 'result.png',
+            path: resultUrl, // Nodemailer сам разберет base64 из path
+            cid: 'tryonresult' // Идентификатор для использования в src="cid:..."
+        }
+    ] : []
   };
 
   try {
@@ -47,11 +79,13 @@ export async function sendClientResultEmail({ email, userName, resultUrl, produc
   }
 }
 
-// 2. Функция "Shadow Logging" (Отправка вам для контроля)
+// 3. Функция "Shadow Logging"
 export async function sendAdminDebugEmail({ userDetails, originalImg, garmentImg, resultImg, logs }) {
-  // Ваш email админа
-  const adminEmail = process.env.GMAIL_USER; // Или другой, если хотите
+  const adminEmail = process.env.GMAIL_USER; 
 
+  // Для админа тоже можно сделать CID, если хотите, но пока оставим как есть,
+  // так как админские письма часто смотрят в веб-клиентах, которые лучше переваривают ссылки.
+  
   const mailOptions = {
     from: '"PARIZOD Debug" <' + process.env.GMAIL_USER + '>',
     to: adminEmail,
@@ -89,7 +123,7 @@ export async function sendAdminDebugEmail({ userDetails, originalImg, garmentImg
   }
 }
 
-// --- НОВАЯ ФУНКЦИЯ ДЛЯ ЗАКАЗОВ ---
+// 4. Функция подтверждения заказа
 export async function sendOrderConfirmationEmail({ email, order, shippingAddress, items, totalAmount, paymentMethod }) {
   if (!email) return;
 

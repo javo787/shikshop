@@ -1,13 +1,12 @@
-// src/app/api/admin/broadcast/route.js
 import { NextResponse } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import { connectMongoDB } from '@/lib/mongodb'; // ИСПРАВЛЕНО
 import Subscriber from '@/models/Subscriber';
-import User from '@/models/User'; // Импортируем модель пользователей
+import User from '@/models/User';
 import { sendEmail } from '@/lib/email';
 
 export async function POST(req) {
   try {
-    await dbConnect();
+    await connectMongoDB(); // ИСПРАВЛЕНО
     const { subject, message, testEmail } = await req.json();
 
     if (!subject || !message) {
@@ -30,7 +29,6 @@ export async function POST(req) {
     const subscribers = await Subscriber.find({ isActive: true }).select('email');
     
     // 2. Получаем зарегистрированных пользователей, у которых есть email
-    // (Можно добавить фильтр, например { role: 'user' }, если нужно)
     const users = await User.find({ email: { $exists: true, $ne: '' } }).select('email');
 
     // 3. Объединяем и убираем дубликаты используя Set

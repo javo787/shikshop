@@ -1,11 +1,10 @@
-// src/app/api/subscribe/route.js
 import { NextResponse } from 'next/server';
-import dbConnect from '@/lib/mongodb';
+import { connectMongoDB } from '@/lib/mongodb'; // ИСПРАВЛЕНО
 import Subscriber from '@/models/Subscriber';
 
 export async function POST(req) {
   try {
-    await dbConnect();
+    await connectMongoDB(); // ИСПРАВЛЕНО
     const { email } = await req.json();
 
     if (!email || !email.includes('@')) {
