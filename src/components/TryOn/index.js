@@ -41,15 +41,16 @@ export default function TryOnModal({ isOpen, onClose, garmentImage, productId, g
   
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    if (isOpen) {
-        const hasSeenTutorial = localStorage.getItem('parizod_tutorial_seen');
-        if (!hasSeenTutorial) {
-            setIsTutorialOpen(true);
-            localStorage.setItem('parizod_tutorial_seen', 'true');
-        }
-    }
-  }, [isOpen]);
+  // трай онди янги одам очганда мажбурлаб курсатиш коментариялаб куилди
+  //useEffect(() => {
+   // if (isOpen) {
+       // const hasSeenTutorial = localStorage.getItem('parizod_tutorial_seen');
+       // if (!hasSeenTutorial) {
+           // setIsTutorialOpen(true);
+           // localStorage.setItem('parizod_tutorial_seen', 'true');
+      //  }
+  //  }
+  //}, [isOpen]);
 
   const handleManualTutorialOpen = () => setIsTutorialOpen(true);
 
