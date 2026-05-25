@@ -10,8 +10,13 @@ export default async function sitemap() {
   const routes = [
     '',
     '/catalog',
-    // '/about', // Раскомментируйте, если есть такая страница
-    // '/contacts',
+    '/about',
+    '/contacts',
+    '/lookbook',
+    '/cart',
+    '/login',
+    '/register',
+    '/profile',
   ].map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date(),

@@ -41,6 +41,12 @@ export default function ClientImage({ src, alt, fill = false, width = 300, heigh
   const initialSrc = getValidSrc(src);
   const finalSrc = error ? '/images/placeholder.jpg' : initialSrc;
 
+  // Разрешаем оптимизацию для доверенных доменов
+  const isTrustedExternal =
+    finalSrc.includes('res.cloudinary.com') ||
+    finalSrc.includes('replicate.delivery') ||
+    finalSrc.includes('replicate.com');
+
   return (
     <Image
       src={finalSrc}
@@ -50,7 +56,8 @@ export default function ClientImage({ src, alt, fill = false, width = 300, heigh
       height={!fill ? height : undefined}
       className={className}
       onError={() => setError(true)}
-      unoptimized={finalSrc.startsWith('http')} 
+      unoptimized={finalSrc.startsWith('http') && !isTrustedExternal}
+      sizes={props.sizes || (fill ? '100vw' : '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw')}
       {...props}
     />
   );
