@@ -1,5 +1,6 @@
 import { connectMongoDB } from '@/lib/mongodb';
-import Product from '@/models/Product'; // ⚠️ Проверьте путь к вашей модели товаров
+import Product from '@/models/Product';
+import Blog from '@/models/Blog';
 
 export default async function sitemap() {
   // 1. Ваш домен
@@ -18,30 +19,37 @@ export default async function sitemap() {
     priority: 1,              // Самый высокий приоритет
   }));
 
-  // 3. Динамические страницы ТОВАРОВ (Профессиональная часть)
-  let productUrls = [];
+  // 3. Динамические товары и блоги
+  let dynamicUrls = [];
   
   try {
     await connectMongoDB();
     
-    // Получаем ID и дату обновления всех товаров
-    // lean() делает запрос быстрее
-    const products = await Product.find({}, '_id updatedAt').lean();
+    const [products, blogs] = await Promise.all([
+      Product.find({}, '_id updatedAt').lean(),
+      Blog.find({}, 'slug createdAt updatedAt').lean(),
+    ]);
 
-    productUrls = products.map((product) => ({
-      // 👇 ВНИМАНИЕ: Проверьте, как у вас открывается товар. 
-      // Если /product/123, оставьте так. Если /catalog/123, поменяйте.
+    const productUrls = products.map((product) => ({
       url: `${baseUrl}/product/${product._id}`, 
       lastModified: product.updatedAt || new Date(),
-      changeFrequency: 'weekly', // Товар меняется реже
-      priority: 0.8,             // Высокий приоритет, но ниже главной
+      changeFrequency: 'weekly',
+      priority: 0.8,
     }));
+
+    const blogUrls = blogs.map((blog) => ({
+      url: `${baseUrl}/blog/${blog.slug}`,
+      lastModified: blog.updatedAt || blog.createdAt || new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    }));
+
+    dynamicUrls = [...productUrls, ...blogUrls];
     
   } catch (error) {
-    console.error('Ошибка генерации sitemap для товаров:', error);
-    // Если база упала, сайтмар всё равно отдаст хотя бы главные страницы
+    console.error('Ошибка генерации sitemap для динамических страниц:', error);
   }
 
   // 4. Объединяем и отдаем
-  return [...routes, ...productUrls];
+  return [...routes, ...dynamicUrls];
 }

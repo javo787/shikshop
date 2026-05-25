@@ -43,6 +43,19 @@ export const metadata = {
     locale: 'ru_TJ',
     siteName: 'PARIZOD Shop',
   },
+  metadataBase: new URL('https://shikshop.vercel.app'),
+  alternates: {
+    canonical: '/',
+    languages: {
+      'ru-TJ': '/ru',
+      'tg-TJ': '/tg',
+    },
+  },
+  manifest: '/manifest.json',
+};
+
+export const viewport = {
+  themeColor: '#ff7f50',
 };
 
 export default async function RootLayout({ children }) {

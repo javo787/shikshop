@@ -1,5 +1,6 @@
 import ProductClient from './ProductClient';
 import { Suspense } from 'react';
+import Script from 'next/script';
 
 // Вспомогательная функция для повторных запросов (если сеть моргнула)
 async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
@@ -112,8 +113,32 @@ export default async function Page({ params }) {
     );
   }
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    image: product.image && (product.image.startsWith('http') ? product.image : `https://shikshop.vercel.app/api/images/${product.image}`),
+    description: product.description,
+    brand: {
+      '@type': 'Brand',
+      name: 'PARIZOD',
+    },
+    offers: {
+      '@type': 'Offer',
+      url: `https://shikshop.vercel.app/product/${product._id}`,
+      priceCurrency: 'TJS',
+      price: product.price,
+      availability: 'https://schema.org/InStock',
+    },
+  };
+
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Загрузка...</div>}>
+      <Script
+        id="product-jsonld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <ProductClient 
         product={product} 
         similarProducts={similarProducts} 

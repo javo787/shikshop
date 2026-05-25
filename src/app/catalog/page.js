@@ -1,17 +1,26 @@
 import CatalogClient from './CatalogClient';
 
-export const metadata = {
-  title: 'Каталог товаров | PARIZOD - Женская одежда и аксессуары',
-  description: 'Просмотрите наш каталог стильной женской одежды, коллекций и аксессуаров. Фильтры по категории, типу, цене и поиск для удобного шопинга.',
-  keywords: 'женская одежда, каталог товаров, коллекции, аксессуары, PARIZOD, купить одежду онлайн',
-  openGraph: {
-    title: 'Каталог товаров | PARIZOD',
-    description: 'Широкий ассортимент женской одежды и аксессуаров с удобными фильтрами.',
-    images: ['/og-image.jpg'], 
-    url: 'https://shikshop.vercel.app/catalog',
-  },
-  robots: 'index, follow',
-};
+import { getTranslations } from 'next-intl/server';
+import { cookies } from 'next/headers';
+
+export async function generateMetadata() {
+  const cookieStore = await cookies();
+  const locale = cookieStore.get('my_shikshop_locale')?.value || 'ru';
+  const t = await getTranslations({ locale, namespace: 'catalog' });
+
+  return {
+    title: `${t('title')} | PARIZOD`,
+    description: t('productsTitle'),
+    keywords: 'женская одежда, каталог товаров, коллекции, аксессуары, PARIZOD, купить одежду онлайн, либоси занона, каталоги маҳсулот',
+    openGraph: {
+      title: `${t('title')} | PARIZOD`,
+      description: t('productsTitle'),
+      images: ['/images/og-image.jpg'],
+      url: 'https://shikshop.vercel.app/catalog',
+    },
+    robots: 'index, follow',
+  };
+}
 
 export default function CatalogPage() {
   return <CatalogClient />;
