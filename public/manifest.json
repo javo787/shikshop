@@ -1,0 +1,16 @@
+{
+  "name": "PARIZOD",
+  "short_name": "PARIZOD",
+  "description": "Интернет-магазин модной женской одежды в Таджикистане.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ff7f50",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
