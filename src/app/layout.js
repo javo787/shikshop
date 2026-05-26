@@ -1,6 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { cookies } from 'next/headers';
-import Script from 'next/script';
 import { Inter, Playfair_Display } from 'next/font/google';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -42,6 +41,21 @@ export const metadata = {
     type: 'website',
     locale: 'ru_TJ',
     siteName: 'PARIZOD Shop',
+    url: 'https://shikshop.vercel.app',
+    images: [
+      {
+        url: '/images/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'PARIZOD - Магазин стильной одежды',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'PARIZOD | Магазин стильной одежды',
+    description: 'Интернет-магазин модной женской одежды в Таджикистане.',
+    images: ['/images/og-image.jpg'],
   },
   metadataBase: new URL('https://shikshop.vercel.app'),
   alternates: {
@@ -72,9 +86,6 @@ export default async function RootLayout({ children }) {
 
   return (
     <html lang={locale} className={`${inter.variable} ${playfair.variable} dark`}>
-      <head>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" />
-      </head>
       <body className="bg-bg-light dark:bg-dark-teal font-sans flex flex-col min-h-screen">
         {/* Google Analytics */}
         <GoogleAnalytics GA_MEASUREMENT_ID="G-QGF9MP9P5S" />
@@ -108,11 +119,6 @@ export default async function RootLayout({ children }) {
             </FavoritesProvider>
           </CartProvider>
         </NextIntlClientProvider>
-        
-        <Script
-          src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"
-          strategy="afterInteractive"
-        />
       </body>
     </html>
   );

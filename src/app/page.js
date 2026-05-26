@@ -17,31 +17,36 @@ export async function generateMetadata() {
   const locale = cookieStore.get('my_shikshop_locale')?.value || 'ru';
   const t = await getTranslations({ locale, namespace: 'home' });
 
+  const title = t('metaTitle') || 'PARIZOD - Женская одежда в Таджикистане';
+  const description = t('metaDescription') || 'Модная женская одежда в Таджикистане. Платья, костюмы, аксессуары и многое другое. Бесплатная доставка по городу!';
+  const keywords = t('metaKeywords') || 'женская одежда, мода, Душанбе, платья, костюмы, аксессуары, курта, либос, харидан, мода2025, новости, Худжанд, Таджикистан, паризод, паризода, паризодшоп, parizod, PARIZOD';
+  const ogImage = 'https://shikshop.vercel.app/images/og-image.jpg';
+
   return {
-    title: t('metaTitle') || 'PARIZOD - Женская одежда в Таджикистане',
-    description: t('metaDescription') || 'Модная женская одежда в Таджикистане. Платья, костюмы, аксессуары и многое другое. Бесплатная доставка по городу!',
-    keywords: t('metaKeywords') || 'женская одежда, мода, Душанбе, платья, костюмы, аксессуары, курта, либос, харидан, мода2025, новости, Худжанд, Таджикистан, паризод, паризода, паризодшоп, parizod, PARIZOD',
+    title,
+    description,
+    keywords,
     openGraph: {
-      title: t('metaTitle') || 'PARIZOD - Женская одежда',
-      description: t('metaDescription') || 'Ознакомьтесь с нашей коллекцией стильной женской одежды в Таджикистане.',
+      title,
+      description,
       url: 'https://shikshop.vercel.app/',
       siteName: 'PARIZOD',
       images: [
         {
-          url: 'https://shikshop.vercel.app/images/og-image.jpg',
+          url: ogImage,
           width: 1200,
           height: 630,
           alt: t('bannerAlt') || 'PARIZOD - Модная женская одежда',
         },
       ],
-      locale: locale || 'ru_TJ',
+      locale: locale === 'ru' ? 'ru_TJ' : 'tg_TJ',
       type: 'website',
     },
     twitter: {
       card: 'summary_large_image',
-      title: t('metaTitle') || 'PARIZOD - Женская одежда',
-      description: t('metaDescription') || 'Модная женская одежда в Таджикистане.',
-      images: ['https://shikshop.vercel.app/images/og-image.jpg'],
+      title,
+      description,
+      images: [ogImage],
     },
   };
 }
